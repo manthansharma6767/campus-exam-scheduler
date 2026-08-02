@@ -4,6 +4,7 @@ import com.manthan.campusexamscheduler.dto.*;
 import com.manthan.campusexamscheduler.entity.Administrator;
 import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Student;
+import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.repository.AdministratorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -56,7 +57,7 @@ public class AdministratorService {
     public AdministratorResponse getAdminById(Long id) {
 
         Administrator administrator = administratorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Administrator not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Administrator not found"));
 
         return AdministratorResponse.builder()
                 .adminId(administrator.getAdminId())
@@ -69,7 +70,7 @@ public class AdministratorService {
             Long id,
             AdministratorRequest request) {
         Administrator administrator = administratorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Admin not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
 
         administrator.setName(request.getName());
         administrator.setEmail(request.getEmail());
@@ -87,7 +88,7 @@ public class AdministratorService {
     public void deleteAdmin(Long id) {
 
         Administrator admin = administratorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Admin not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
 
         administratorRepository.delete(admin);
     }

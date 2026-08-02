@@ -4,6 +4,7 @@ package com.manthan.campusexamscheduler.service;
 import com.manthan.campusexamscheduler.dto.DepartmentRequest;
 import com.manthan.campusexamscheduler.dto.DepartmentResponse;
 import com.manthan.campusexamscheduler.entity.Department;
+import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.repository.DepartmentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,7 +19,7 @@ public class DepartmentService {
 
     public DepartmentResponse createDepartment(DepartmentRequest request) throws Exception {
         if(departmentRepository.existsByDepartmentName(request.getDepartmentName())) {
-            throw new RuntimeException("Department already exists");
+            throw new ResourceNotFoundException("Department already exists");
         }
         Department department = Department.builder()
                 .departmentName(request.getDepartmentName())
@@ -47,7 +48,7 @@ public class DepartmentService {
 
     public DepartmentResponse findById(Long id) {
         Department department = departmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Department not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
 
         return DepartmentResponse
                 .builder()
@@ -60,7 +61,7 @@ public class DepartmentService {
             Long id,
             DepartmentRequest request) {
         Department department = departmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Department not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
 
         department.setDepartmentName(request.getDepartmentName());
 
@@ -75,7 +76,7 @@ public class DepartmentService {
     public void deleteDepartment(Long id) {
 
         Department department = departmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Department not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
 
         departmentRepository.delete(department);
     }

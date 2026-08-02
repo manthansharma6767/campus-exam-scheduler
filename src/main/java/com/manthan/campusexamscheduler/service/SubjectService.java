@@ -4,6 +4,7 @@ import com.manthan.campusexamscheduler.dto.SubjectRequest;
 import com.manthan.campusexamscheduler.dto.SubjectResponse;
 import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Subject;
+import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.repository.DepartmentRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +22,11 @@ public class SubjectService {
     public SubjectResponse createSubject(SubjectRequest request) {
 
         if (subjectRepository.existsBySubjectCode(request.getSubjectCode())) {
-            throw new RuntimeException("Subject code already exists");
+            throw new ResourceNotFoundException("Subject code already exists");
         }
 
         Department department = departmentRepository.findById(request.getDepartmentId())
-                .orElseThrow(() -> new RuntimeException("Department not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
 
         Subject subject = Subject.builder()
                 .subjectCode(request.getSubjectCode())
@@ -65,7 +66,7 @@ public class SubjectService {
     public SubjectResponse getSubjectById(Long id) {
 
         Subject subject = subjectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Subject not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
 
         return SubjectResponse.builder()
                 .subjectId(subject.getSubjectId())
@@ -80,10 +81,10 @@ public class SubjectService {
     public SubjectResponse updateSubject(Long id, SubjectRequest request) {
 
         Subject subject = subjectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Subject not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
 
         Department department = departmentRepository.findById(request.getDepartmentId())
-                .orElseThrow(() -> new RuntimeException("Department not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
 
         subject.setSubjectCode(request.getSubjectCode());
         subject.setSubjectName(request.getSubjectName());
@@ -105,7 +106,7 @@ public class SubjectService {
     public void deleteSubject(Long id) {
 
         Subject subject = subjectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Subject not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
 
         subjectRepository.delete(subject);
     }

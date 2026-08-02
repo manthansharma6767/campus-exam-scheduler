@@ -4,6 +4,7 @@ import com.manthan.campusexamscheduler.dto.StudentRequest;
 import com.manthan.campusexamscheduler.dto.StudentResponse;
 import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Student;
+import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.repository.DepartmentRepository;
 import com.manthan.campusexamscheduler.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,12 +27,12 @@ public class StudentService {
         }
 
         if (studentRepository.existsByEnrollmentNumber(request.getEnrollmentNumber())) {
-            throw new RuntimeException("Enrollment number already exists");
+            throw new ResourceNotFoundException("Enrollment number already exists");
         }
 
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() ->
-                        new RuntimeException("Department not found"));
+                        new ResourceNotFoundException("Department not found"));
 
         Student student = Student.builder()
                 .name(request.getName())
@@ -78,7 +79,7 @@ public class StudentService {
 
         Student student = studentRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Student not found"));
+                        new ResourceNotFoundException("Student not found"));
 
         return StudentResponse.builder()
                 .studentId(student.getStudentId())
@@ -96,11 +97,11 @@ public class StudentService {
 
         Student student = studentRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Student not found"));
+                        new ResourceNotFoundException("Student not found"));
 
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() ->
-                        new RuntimeException("Department not found"));
+                        new ResourceNotFoundException("Department not found"));
 
         student.setName(request.getName());
         student.setEmail(request.getEmail());
@@ -127,7 +128,7 @@ public class StudentService {
 
         Student student = studentRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Student not found"));
+                        new ResourceNotFoundException("Student not found"));
 
         studentRepository.delete(student);
     }

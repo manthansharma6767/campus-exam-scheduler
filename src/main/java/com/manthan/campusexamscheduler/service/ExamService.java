@@ -7,6 +7,7 @@ import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Exam;
 import com.manthan.campusexamscheduler.entity.Student;
 import com.manthan.campusexamscheduler.entity.Subject;
+import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.repository.ExamRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,7 @@ public class ExamService {
         Subject subject = subjectRepository
                 .findById(request.getSubjectId())
                 .orElseThrow(() ->
-                        new RuntimeException("Subject not found"));
+                        new ResourceNotFoundException("Subject not found"));
 
         // DTO -> Entity
         Exam exam = Exam.builder()
@@ -75,7 +76,7 @@ public class ExamService {
 
         Exam exam = examRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Exam not found"));
+                        new ResourceNotFoundException("Exam not found"));
 
         return ExamResponse.builder()
                 .subjectName(exam.getSubject().getSubjectName())
@@ -93,11 +94,11 @@ public class ExamService {
 
         Exam exam = examRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Exam not found"));
+                        new ResourceNotFoundException("Exam not found"));
 
         Subject subject = subjectRepository.findById(request.getSubjectId())
                 .orElseThrow(() ->
-                        new RuntimeException("Subject not found"));
+                        new ResourceNotFoundException("Subject not found"));
 
         exam.setExamDate(request.getExamDate());
         exam.setExamTime(request.getExamTime());
@@ -122,7 +123,7 @@ public class ExamService {
 
         Exam exam = examRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Exam not found"));
+                        new ResourceNotFoundException("Exam not found"));
 
         examRepository.delete(exam);
     }

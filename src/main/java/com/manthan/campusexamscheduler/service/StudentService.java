@@ -148,7 +148,7 @@ public class StudentService {
 
         // Find Exams
         List<Exam> exams = examRepository
-                .findBySubject_DepartmentAndSubject_Semester(
+                .findBySubject_DepartmentAndSubject_SemesterOrderByExamDateAscExamTimeAsc(
                         student.getDepartment(),
                         student.getSemester()
                 );

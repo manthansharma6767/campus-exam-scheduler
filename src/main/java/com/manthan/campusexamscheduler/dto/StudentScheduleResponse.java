@@ -10,21 +10,17 @@ import java.time.LocalTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ExamResponse {
-
-    private Long examId;
-
-    private LocalDate examDate;
-
-    private LocalTime examTime;
-
-    private String roomNumber;
-
-    private Long subjectId;
+public class StudentScheduleResponse {
 
     private String subjectCode;
 
     private String subjectName;
 
+    private LocalDate examDate;
+
+    private LocalTime examTime;
+
     private String building;
+
+    private String roomNumber;
 }

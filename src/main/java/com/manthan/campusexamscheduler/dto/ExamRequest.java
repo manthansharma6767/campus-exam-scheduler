@@ -28,4 +28,8 @@ public class ExamRequest {
 
     @NotNull
     private Long subjectId;
+
+    @NotBlank
+    @Size(max = 100)
+    private String building;
 }

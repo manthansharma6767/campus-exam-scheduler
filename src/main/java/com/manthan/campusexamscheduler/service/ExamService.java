@@ -35,6 +35,7 @@ public class ExamService {
                 .examDate(request.getExamDate())
                 .examTime(request.getExamTime())
                 .roomNumber(request.getRoomNumber())
+                .building(request.getBuilding())
                 .subject(subject)
                 .build();
 
@@ -50,6 +51,7 @@ public class ExamService {
                 .subjectId(savedExam.getSubject().getSubjectId())
                 .subjectCode(savedExam.getSubject().getSubjectCode())
                 .subjectName(savedExam.getSubject().getSubjectName())
+                .building(savedExam.getBuilding())
                 .build();
     }
 
@@ -67,6 +69,7 @@ public class ExamService {
                         .subjectId(exam.getSubject().getSubjectId())
                         .subjectCode(exam.getSubject().getSubjectCode())
                         .subjectName(exam.getSubject().getSubjectName())
+                        .building(exam.getBuilding())
                         .build())
                 .toList();
     }
@@ -85,6 +88,7 @@ public class ExamService {
                 .examDate(exam.getExamDate())
                 .roomNumber(exam.getRoomNumber())
                 .subjectCode(exam.getSubject().getSubjectCode())
+                .building(exam.getBuilding())
                 .subjectId(exam.getSubject().getSubjectId())
                 .build();
     }
@@ -103,6 +107,7 @@ public class ExamService {
         exam.setExamDate(request.getExamDate());
         exam.setExamTime(request.getExamTime());
         exam.setRoomNumber(request.getRoomNumber());
+        exam.setBuilding(request.getBuilding());
         exam.setSubject(subject);
 
         Exam updatedExam = examRepository.save(exam);
@@ -115,6 +120,7 @@ public class ExamService {
                 .subjectId(updatedExam.getSubject().getSubjectId())
                 .subjectCode(updatedExam.getSubject().getSubjectCode())
                 .subjectName(updatedExam.getSubject().getSubjectName())
+                .building(updatedExam.getBuilding())
                 .build();
     }
 

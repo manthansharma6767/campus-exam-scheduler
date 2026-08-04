@@ -34,6 +34,11 @@ public class Exam {
     @Column(nullable = false, length = 20)
     private String roomNumber;
 
+    @NotBlank
+    @Size(max = 100)
+    @Column(nullable = false, length = 100)
+    private String building;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subject_id", nullable = false)
     private Subject subject;

@@ -9,6 +9,9 @@ import com.manthan.campusexamscheduler.repository.DepartmentRepository;
 import com.manthan.campusexamscheduler.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.manthan.campusexamscheduler.dto.StudentScheduleResponse;
+import com.manthan.campusexamscheduler.entity.Exam;
+import com.manthan.campusexamscheduler.repository.ExamRepository;
 
 import java.util.List;
 
@@ -18,6 +21,7 @@ public class StudentService {
 
     private final StudentRepository studentRepository;
     private final DepartmentRepository departmentRepository;
+    private final ExamRepository examRepository;
 
     // CREATE
     public StudentResponse registerStudent(StudentRequest request) {
@@ -131,5 +135,34 @@ public class StudentService {
                         new ResourceNotFoundException("Student not found"));
 
         studentRepository.delete(student);
+    }
+    // find students with there enrollment number
+    public List<StudentScheduleResponse> getStudentSchedule(
+            String enrollmentNumber) {
+
+        // Find Student
+        Student student = studentRepository
+                .findByEnrollmentNumber(enrollmentNumber)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Student not found"));
+
+        // Find Exams
+        List<Exam> exams = examRepository
+                .findBySubject_DepartmentAndSubject_Semester(
+                        student.getDepartment(),
+                        student.getSemester()
+                );
+
+        // Convert Entity -> DTO
+        return exams.stream()
+                .map(exam -> StudentScheduleResponse.builder()
+                        .subjectCode(exam.getSubject().getSubjectCode())
+                        .subjectName(exam.getSubject().getSubjectName())
+                        .examDate(exam.getExamDate())
+                        .examTime(exam.getExamTime())
+                        .building(exam.getBuilding())
+                        .roomNumber(exam.getRoomNumber())
+                        .build())
+                .toList();
     }
 }

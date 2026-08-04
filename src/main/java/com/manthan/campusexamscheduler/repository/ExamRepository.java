@@ -10,13 +10,9 @@ import java.util.List;
 @Repository
 public interface ExamRepository extends JpaRepository<Exam, Long> {
 
-    List<Exam> findBySubjectSemester(Integer semester);
-
-    List<Exam> findBySubjectDepartment(Department department);
-
-    List<Exam> findBySubjectSemesterAndSubjectDepartment(
-            Integer semester,
-            Department department
+    List<Exam> findBySubject_DepartmentAndSubject_Semester(
+            Department department,
+            Integer semester
     );
 
 }

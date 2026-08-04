@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.manthan.campusexamscheduler.dto.StudentScheduleResponse;
 
 import java.util.List;
 
@@ -46,5 +47,14 @@ public class StudentController {
         studentService.deleteStudent(id);
 
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{enrollmentNumber}/schedule")
+    public ResponseEntity<List<StudentScheduleResponse>> getStudentSchedule(
+            @PathVariable String enrollmentNumber) {
+
+        return ResponseEntity.ok(
+                studentService.getStudentSchedule(enrollmentNumber)
+        );
     }
 }

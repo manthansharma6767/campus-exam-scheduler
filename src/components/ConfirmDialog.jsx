@@ -19,12 +19,12 @@ export default function ConfirmDialog({ open, title, message, onConfirm, onCance
     >
       <DialogTitle id="confirm-dialog-title" sx={{ pb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <WarningAmberIcon color="warning" />
+          <WarningAmberIcon sx={{ color: '#FFB300' }} />
           {title || 'Confirm Action'}
         </Box>
       </DialogTitle>
       <DialogContent>
-        <DialogContentText id="confirm-dialog-description">
+        <DialogContentText id="confirm-dialog-description" sx={{ color: '#B0B0B0' }}>
           {message || 'Are you sure you want to proceed? This action cannot be undone.'}
         </DialogContentText>
       </DialogContent>
@@ -34,6 +34,7 @@ export default function ConfirmDialog({ open, title, message, onConfirm, onCance
           variant="outlined"
           color="inherit"
           aria-label="Cancel action"
+          sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#B0B0B0' }}
         >
           Cancel
         </Button>

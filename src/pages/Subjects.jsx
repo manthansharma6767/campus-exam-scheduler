@@ -139,14 +139,14 @@ export default function Subjects() {
   return (
     <Fade in timeout={600}>
       <Box>
-        <Box sx={{ background: 'linear-gradient(135deg, #0A1929 0%, #1A3A5C 100%)', color: 'white', py: { xs: 3, md: 4 } }}>
+        <Box sx={{ background: 'linear-gradient(135deg, #1A1A1A 0%, #2D1500 50%, #4A1800 100%)', color: 'white', py: { xs: 3, md: 4 } }}>
           <Container maxWidth="lg">
             <Button component={Link} to="/admin/dashboard" startIcon={<ArrowBackIcon />}
-              sx={{ color: 'rgba(255,255,255,0.8)', mb: 1, '&:hover': { color: 'white', backgroundColor: 'rgba(255,255,255,0.1)' } }}>
+              sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, '&:hover': { color: '#FF8F00', backgroundColor: 'rgba(230, 81, 0, 0.08)' } }}>
               Back to Dashboard
             </Button>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <MenuBookIcon sx={{ fontSize: 30 }} />
+              <MenuBookIcon sx={{ fontSize: 30, color: '#FF8F00' }} />
               <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.3rem', md: '1.75rem' } }}>
                 Subject Management
               </Typography>
@@ -154,62 +154,65 @@ export default function Subjects() {
           </Container>
         </Box>
 
-        <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-            <Button id="add-subject-button" variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openAdd}>
-              Add Subject
-            </Button>
-          </Box>
-
-          {loading ? (
-            <Loading message="Loading subjects..." />
-          ) : subjects.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 8 }}>
-              <MenuBookIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.3, mb: 2 }} />
-              <Typography variant="h6" color="text.secondary">No subjects found</Typography>
+        <Box sx={{ background: '#1A1A1A', minHeight: '60vh' }}>
+          <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+              <Button id="add-subject-button" variant="contained" startIcon={<AddIcon />} onClick={openAdd}
+                sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
+                Add Subject
+              </Button>
             </Box>
-          ) : (
-            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, overflowX: 'auto' }}>
-              <Table aria-label="Subjects table" sx={{ minWidth: 600 }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Code</TableCell>
-                    <TableCell>Subject Name</TableCell>
-                    <TableCell>Semester</TableCell>
-                    <TableCell>Department</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {subjects.map((sub) => (
-                    <TableRow key={sub.subjectId}>
-                      <TableCell>
-                        <Chip label={sub.subjectCode} size="small" variant="outlined" color="secondary" />
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 500 }}>{sub.subjectName}</TableCell>
-                      <TableCell>{sub.semester}</TableCell>
-                      <TableCell>{sub.departmentName}</TableCell>
-                      <TableCell align="right">
-                        <IconButton color="secondary" onClick={() => openEdit(sub)} aria-label={`Edit ${sub.subjectName}`} size="small">
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton color="error" onClick={() => { setDeleteTarget(sub); setConfirmOpen(true); }} aria-label={`Delete ${sub.subjectName}`} size="small" sx={{ ml: 0.5 }}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
+
+            {loading ? (
+              <Loading message="Loading subjects..." />
+            ) : subjects.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <MenuBookIcon sx={{ fontSize: 64, color: '#B0B0B0', opacity: 0.2, mb: 2 }} />
+                <Typography variant="h6" sx={{ color: '#B0B0B0' }}>No subjects found</Typography>
+              </Box>
+            ) : (
+              <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3, overflowX: 'auto', backgroundColor: '#242424' }}>
+                <Table aria-label="Subjects table" sx={{ minWidth: 600 }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Code</TableCell>
+                      <TableCell>Subject Name</TableCell>
+                      <TableCell>Semester</TableCell>
+                      <TableCell>Department</TableCell>
+                      <TableCell align="right">Actions</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Container>
+                  </TableHead>
+                  <TableBody>
+                    {subjects.map((sub) => (
+                      <TableRow key={sub.subjectId}>
+                        <TableCell>
+                          <Chip label={sub.subjectCode} size="small" variant="outlined" sx={{ borderColor: '#FF8F00', color: '#FFB300' }} />
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 500 }}>{sub.subjectName}</TableCell>
+                        <TableCell>{sub.semester}</TableCell>
+                        <TableCell>{sub.departmentName}</TableCell>
+                        <TableCell align="right">
+                          <IconButton onClick={() => openEdit(sub)} aria-label={`Edit ${sub.subjectName}`} size="small" sx={{ color: '#FF8F00' }}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton color="error" onClick={() => { setDeleteTarget(sub); setConfirmOpen(true); }} aria-label={`Delete ${sub.subjectName}`} size="small" sx={{ ml: 0.5 }}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Container>
+        </Box>
 
         {/* Add/Edit Dialog */}
         <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth aria-labelledby="subject-dialog-title">
           <DialogTitle id="subject-dialog-title">{editing ? 'Edit Subject' : 'Add Subject'}</DialogTitle>
           <DialogContent>
-            {formError && <Alert severity="error" sx={{ mb: 2, mt: 1, borderRadius: 2 }}>{formError}</Alert>}
+            {formError && <Alert severity="error" sx={{ mb: 2, mt: 1, borderRadius: 2, backgroundColor: 'rgba(239, 83, 80, 0.1)', color: '#EF5350' }}>{formError}</Alert>}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
               <TextField name="subjectCode" label="Subject Code" value={form.subjectCode} onChange={handleChange}
                 placeholder="e.g. CS301" slotProps={{ htmlInput: { 'aria-label': 'Subject code', maxLength: 20 } }} fullWidth autoFocus />
@@ -231,7 +234,8 @@ export default function Subjects() {
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button onClick={() => setDialogOpen(false)} color="inherit" variant="outlined">Cancel</Button>
-            <Button onClick={handleSubmit} variant="contained" color="secondary" disabled={submitting}>
+            <Button onClick={handleSubmit} variant="contained" disabled={submitting}
+              sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
               {submitting ? 'Saving...' : editing ? 'Update' : 'Create'}
             </Button>
           </DialogActions>

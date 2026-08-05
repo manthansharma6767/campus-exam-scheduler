@@ -45,9 +45,17 @@ export default function SearchResult() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 6 }}>
+      <Box
+        sx={{
+          minHeight: '60vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(180deg, #2D1500 0%, #1A1A1A 100%)',
+        }}
+      >
         <Loading message="Loading exam schedule..." />
-      </Container>
+      </Box>
     );
   }
 
@@ -57,7 +65,7 @@ export default function SearchResult() {
         {/* Header */}
         <Box
           sx={{
-            background: 'linear-gradient(135deg, #0A1929 0%, #1A3A5C 100%)',
+            background: 'linear-gradient(135deg, #1A1A1A 0%, #2D1500 50%, #4A1800 100%)',
             color: 'white',
             py: { xs: 4, md: 5 },
           }}
@@ -68,11 +76,11 @@ export default function SearchResult() {
               to="/"
               startIcon={<ArrowBackIcon />}
               sx={{
-                color: 'rgba(255,255,255,0.8)',
+                color: 'rgba(255,255,255,0.7)',
                 mb: 2,
                 '&:hover': {
-                  color: 'white',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: '#FF8F00',
+                  backgroundColor: 'rgba(230, 81, 0, 0.08)',
                 },
               }}
             >
@@ -81,91 +89,110 @@ export default function SearchResult() {
             <Typography
               variant="h3"
               sx={{
-                fontWeight: 700,
-                fontSize: { xs: '1.5rem', md: '2rem' },
+                fontWeight: 800,
+                fontSize: { xs: '1.5rem', md: '2.2rem' },
+                fontFamily: '"Playfair Display", "Georgia", serif',
+                fontStyle: 'italic',
               }}
             >
               Exam Schedule
             </Typography>
             <Typography
               variant="body1"
-              sx={{ opacity: 0.8, mt: 0.5 }}
+              sx={{ opacity: 0.7, mt: 0.5 }}
             >
-              Enrollment: <strong>{enrollmentNumber}</strong>
+              Enrollment: <Box component="strong" sx={{ color: '#FF8F00' }}>{enrollmentNumber}</Box>
             </Typography>
           </Container>
         </Box>
 
-        <Container maxWidth="lg" sx={{ py: { xs: 4, md: 5 } }}>
-          {/* Student Not Found */}
-          {error === 'student_not_found' && (
-            <Box sx={{ textAlign: 'center', py: 8 }}>
-              <PersonOffIcon sx={{ fontSize: 72, color: 'text.secondary', opacity: 0.4, mb: 2 }} />
-              <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
-                Student Not Found
-              </Typography>
-              <Typography color="text.secondary" sx={{ mb: 3, maxWidth: 420, mx: 'auto' }}>
-                No student found with enrollment number <strong>{enrollmentNumber}</strong>.
-                Please check the number and try again.
-              </Typography>
-              <Button
-                component={Link}
-                to="/"
-                variant="contained"
-                color="secondary"
-                startIcon={<ArrowBackIcon />}
-              >
-                Search Again
-              </Button>
-            </Box>
-          )}
+        <Box
+          sx={{
+            background: '#1A1A1A',
+            minHeight: '50vh',
+          }}
+        >
+          <Container maxWidth="lg" sx={{ py: { xs: 4, md: 5 } }}>
+            {/* Student Not Found */}
+            {error === 'student_not_found' && (
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <PersonOffIcon sx={{ fontSize: 72, color: '#B0B0B0', opacity: 0.3, mb: 2 }} />
+                <Typography variant="h5" sx={{ fontWeight: 600, mb: 1, color: '#FFFFFF' }}>
+                  Student Not Found
+                </Typography>
+                <Typography sx={{ mb: 3, maxWidth: 420, mx: 'auto', color: '#B0B0B0' }}>
+                  No student found with enrollment number <strong>{enrollmentNumber}</strong>.
+                  Please check the number and try again.
+                </Typography>
+                <Button
+                  component={Link}
+                  to="/"
+                  variant="contained"
+                  startIcon={<ArrowBackIcon />}
+                  sx={{
+                    background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)',
+                    },
+                  }}
+                >
+                  Search Again
+                </Button>
+              </Box>
+            )}
 
-          {/* Unexpected Error */}
-          {error === 'unexpected' && (
-            <Alert severity="error" sx={{ borderRadius: 3 }}>
-              An unexpected error occurred. Please try again later.
-            </Alert>
-          )}
+            {/* Unexpected Error */}
+            {error === 'unexpected' && (
+              <Alert severity="error" sx={{ borderRadius: 3, backgroundColor: 'rgba(239, 83, 80, 0.1)', color: '#EF5350' }}>
+                An unexpected error occurred. Please try again later.
+              </Alert>
+            )}
 
-          {/* No Exams Scheduled */}
-          {!error && exams.length === 0 && (
-            <Box sx={{ textAlign: 'center', py: 8 }}>
-              <EventBusyIcon sx={{ fontSize: 72, color: 'text.secondary', opacity: 0.4, mb: 2 }} />
-              <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
-                No Exams Scheduled
-              </Typography>
-              <Typography color="text.secondary" sx={{ mb: 3, maxWidth: 420, mx: 'auto' }}>
-                There are currently no exams scheduled for enrollment number{' '}
-                <strong>{enrollmentNumber}</strong>.
-              </Typography>
-              <Button
-                component={Link}
-                to="/"
-                variant="contained"
-                color="secondary"
-                startIcon={<ArrowBackIcon />}
-              >
-                Search Again
-              </Button>
-            </Box>
-          )}
+            {/* No Exams Scheduled */}
+            {!error && exams.length === 0 && (
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <EventBusyIcon sx={{ fontSize: 72, color: '#B0B0B0', opacity: 0.3, mb: 2 }} />
+                <Typography variant="h5" sx={{ fontWeight: 600, mb: 1, color: '#FFFFFF' }}>
+                  No Exams Scheduled
+                </Typography>
+                <Typography sx={{ mb: 3, maxWidth: 420, mx: 'auto', color: '#B0B0B0' }}>
+                  There are currently no exams scheduled for enrollment number{' '}
+                  <strong>{enrollmentNumber}</strong>.
+                </Typography>
+                <Button
+                  component={Link}
+                  to="/"
+                  variant="contained"
+                  startIcon={<ArrowBackIcon />}
+                  sx={{
+                    background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)',
+                    },
+                  }}
+                >
+                  Search Again
+                </Button>
+              </Box>
+            )}
 
-          {/* Exam Results */}
-          {!error && exams.length > 0 && (
-            <>
-              <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                {exams.length} Exam{exams.length !== 1 ? 's' : ''} Found
-              </Typography>
-              <Grid container spacing={3}>
-                {exams.map((exam, index) => (
-                  <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={index}>
-                    <ExamCard exam={exam} />
-                  </Grid>
-                ))}
-              </Grid>
-            </>
-          )}
-        </Container>
+            {/* Exam Results */}
+            {!error && exams.length > 0 && (
+              <>
+                <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, color: '#FFB300' }}>
+                  {exams.length} Exam{exams.length !== 1 ? 's' : ''} Found
+                </Typography>
+                <Grid container spacing={3}>
+                  {exams.map((exam, index) => (
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={index}>
+                      <ExamCard exam={exam} />
+                    </Grid>
+                  ))}
+                </Grid>
+              </>
+            )}
+          </Container>
+        </Box>
       </Box>
     </Fade>
   );

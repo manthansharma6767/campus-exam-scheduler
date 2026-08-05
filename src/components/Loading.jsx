@@ -19,12 +19,11 @@ export default function Loading({ message = 'Loading...' }) {
         <CircularProgress
           size={48}
           thickness={4}
-          sx={{ color: 'secondary.main' }}
+          sx={{ color: '#FF8F00' }}
         />
         <Typography
           variant="body1"
-          color="text.secondary"
-          sx={{ fontWeight: 500 }}
+          sx={{ fontWeight: 500, color: '#B0B0B0' }}
         >
           {message}
         </Typography>

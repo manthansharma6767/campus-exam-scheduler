@@ -77,7 +77,7 @@ export default function AdminLogin() {
           justifyContent: 'center',
           py: { xs: 4, md: 6 },
           px: 2,
-          background: 'linear-gradient(180deg, #F5F7FA 0%, #FFFFFF 100%)',
+          background: 'linear-gradient(180deg, #2D1500 0%, #1A1A1A 50%, #1A1A1A 100%)',
         }}
       >
         <Container maxWidth="sm">
@@ -86,8 +86,9 @@ export default function AdminLogin() {
             sx={{
               p: { xs: 3, sm: 5 },
               borderRadius: 4,
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 4px 20px rgba(10, 25, 41, 0.08)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              backgroundColor: '#242424',
+              boxShadow: '0 8px 40px rgba(0, 0, 0, 0.4)',
             }}
           >
             {/* Header */}
@@ -97,27 +98,37 @@ export default function AdminLogin() {
                   width: 64,
                   height: 64,
                   borderRadius: 3,
-                  background: 'linear-gradient(135deg, #0A1929 0%, #1A3A5C 100%)',
+                  background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   mx: 'auto',
                   mb: 2,
+                  boxShadow: '0 4px 16px rgba(230, 81, 0, 0.35)',
                 }}
               >
                 <AdminPanelSettingsIcon sx={{ fontSize: 32, color: 'white' }} />
               </Box>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
                 Admin Login
               </Typography>
-              <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+              <Typography sx={{ mt: 0.5, color: '#B0B0B0' }}>
                 Sign in to manage the exam scheduler
               </Typography>
             </Box>
 
             {/* Error Alert */}
             {error && (
-              <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+              <Alert
+                severity="error"
+                sx={{
+                  mb: 3,
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(239, 83, 80, 0.1)',
+                  color: '#EF5350',
+                  border: '1px solid rgba(239, 83, 80, 0.2)',
+                }}
+              >
                 {error}
               </Alert>
             )}
@@ -137,7 +148,7 @@ export default function AdminLogin() {
                   input: {
                     startAdornment: (
                       <InputAdornment position="start">
-                        <EmailIcon color="action" />
+                        <EmailIcon sx={{ color: '#B0B0B0' }} />
                       </InputAdornment>
                     ),
                   },
@@ -158,7 +169,7 @@ export default function AdminLogin() {
                   input: {
                     startAdornment: (
                       <InputAdornment position="start">
-                        <LockIcon color="action" />
+                        <LockIcon sx={{ color: '#B0B0B0' }} />
                       </InputAdornment>
                     ),
                     endAdornment: (
@@ -167,6 +178,7 @@ export default function AdminLogin() {
                           onClick={() => setShowPassword(!showPassword)}
                           edge="end"
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          sx={{ color: '#B0B0B0' }}
                         >
                           {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                         </IconButton>
@@ -182,12 +194,24 @@ export default function AdminLogin() {
                 id="admin-login-button"
                 type="submit"
                 variant="contained"
-                color="primary"
                 fullWidth
                 size="large"
                 disabled={loading}
                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
-                sx={{ py: 1.5, fontSize: '1rem' }}
+                sx={{
+                  py: 1.5,
+                  fontSize: '1rem',
+                  background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)',
+                  boxShadow: '0 4px 16px rgba(230, 81, 0, 0.35)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)',
+                    boxShadow: '0 6px 24px rgba(230, 81, 0, 0.5)',
+                  },
+                  '&.Mui-disabled': {
+                    backgroundColor: 'rgba(230, 81, 0, 0.3)',
+                    color: 'rgba(255,255,255,0.5)',
+                  },
+                }}
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </Button>

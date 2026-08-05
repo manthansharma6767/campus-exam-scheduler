@@ -121,7 +121,7 @@ export default function Departments() {
         {/* Header */}
         <Box
           sx={{
-            background: 'linear-gradient(135deg, #0A1929 0%, #1A3A5C 100%)',
+            background: 'linear-gradient(135deg, #1A1A1A 0%, #2D1500 50%, #4A1800 100%)',
             color: 'white',
             py: { xs: 3, md: 4 },
           }}
@@ -131,12 +131,12 @@ export default function Departments() {
               component={Link}
               to="/admin/dashboard"
               startIcon={<ArrowBackIcon />}
-              sx={{ color: 'rgba(255,255,255,0.8)', mb: 1, '&:hover': { color: 'white', backgroundColor: 'rgba(255,255,255,0.1)' } }}
+              sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, '&:hover': { color: '#FF8F00', backgroundColor: 'rgba(230, 81, 0, 0.08)' } }}
             >
               Back to Dashboard
             </Button>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <AccountBalanceIcon sx={{ fontSize: 30 }} />
+              <AccountBalanceIcon sx={{ fontSize: 30, color: '#FF8F00' }} />
               <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.3rem', md: '1.75rem' } }}>
                 Department Management
               </Typography>
@@ -144,70 +144,75 @@ export default function Departments() {
           </Container>
         </Box>
 
-        <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
-          {/* Toolbar */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-            <Button
-              id="add-department-button"
-              variant="contained"
-              color="secondary"
-              startIcon={<AddIcon />}
-              onClick={openAdd}
-            >
-              Add Department
-            </Button>
-          </Box>
-
-          {/* Table */}
-          {loading ? (
-            <Loading message="Loading departments..." />
-          ) : departments.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 8 }}>
-              <AccountBalanceIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.3, mb: 2 }} />
-              <Typography variant="h6" color="text.secondary">No departments found</Typography>
-              <Typography color="text.secondary" sx={{ mb: 2 }}>Click "Add Department" to create your first department.</Typography>
+        <Box sx={{ background: '#1A1A1A', minHeight: '60vh' }}>
+          <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
+            {/* Toolbar */}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+              <Button
+                id="add-department-button"
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={openAdd}
+                sx={{
+                  background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)',
+                  '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' },
+                }}
+              >
+                Add Department
+              </Button>
             </Box>
-          ) : (
-            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-              <Table aria-label="Departments table">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Department Name</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {departments.map((dept) => (
-                    <TableRow key={dept.departmentId}>
-                      <TableCell sx={{ fontWeight: 500 }}>{dept.departmentId}</TableCell>
-                      <TableCell>{dept.departmentName}</TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          color="secondary"
-                          onClick={() => openEdit(dept)}
-                          aria-label={`Edit ${dept.departmentName}`}
-                          size="small"
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          color="error"
-                          onClick={() => { setDeleteTarget(dept); setConfirmOpen(true); }}
-                          aria-label={`Delete ${dept.departmentName}`}
-                          size="small"
-                          sx={{ ml: 0.5 }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
+
+            {/* Table */}
+            {loading ? (
+              <Loading message="Loading departments..." />
+            ) : departments.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <AccountBalanceIcon sx={{ fontSize: 64, color: '#B0B0B0', opacity: 0.2, mb: 2 }} />
+                <Typography variant="h6" sx={{ color: '#B0B0B0' }}>No departments found</Typography>
+                <Typography sx={{ color: '#888', mb: 2 }}>Click "Add Department" to create your first department.</Typography>
+              </Box>
+            ) : (
+              <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3, backgroundColor: '#242424' }}>
+                <Table aria-label="Departments table">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>ID</TableCell>
+                      <TableCell>Department Name</TableCell>
+                      <TableCell align="right">Actions</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Container>
+                  </TableHead>
+                  <TableBody>
+                    {departments.map((dept) => (
+                      <TableRow key={dept.departmentId}>
+                        <TableCell sx={{ fontWeight: 500, color: '#FFB300' }}>{dept.departmentId}</TableCell>
+                        <TableCell>{dept.departmentName}</TableCell>
+                        <TableCell align="right">
+                          <IconButton
+                            onClick={() => openEdit(dept)}
+                            aria-label={`Edit ${dept.departmentName}`}
+                            size="small"
+                            sx={{ color: '#FF8F00' }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            color="error"
+                            onClick={() => { setDeleteTarget(dept); setConfirmOpen(true); }}
+                            aria-label={`Delete ${dept.departmentName}`}
+                            size="small"
+                            sx={{ ml: 0.5 }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Container>
+        </Box>
 
         {/* Add/Edit Dialog */}
         <Dialog
@@ -221,7 +226,7 @@ export default function Departments() {
             {editing ? 'Edit Department' : 'Add Department'}
           </DialogTitle>
           <DialogContent>
-            {formError && <Alert severity="error" sx={{ mb: 2, mt: 1, borderRadius: 2 }}>{formError}</Alert>}
+            {formError && <Alert severity="error" sx={{ mb: 2, mt: 1, borderRadius: 2, backgroundColor: 'rgba(239, 83, 80, 0.1)', color: '#EF5350' }}>{formError}</Alert>}
             <TextField
               id="department-name-input"
               label="Department Name"
@@ -236,7 +241,15 @@ export default function Departments() {
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button onClick={() => setDialogOpen(false)} color="inherit" variant="outlined">Cancel</Button>
-            <Button onClick={handleSubmit} variant="contained" color="secondary" disabled={submitting}>
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
+              disabled={submitting}
+              sx={{
+                background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)',
+                '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' },
+              }}
+            >
               {submitting ? 'Saving...' : editing ? 'Update' : 'Create'}
             </Button>
           </DialogActions>

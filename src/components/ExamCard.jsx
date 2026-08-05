@@ -39,81 +39,91 @@ export default function ExamCard({ exam }) {
         flexDirection: 'column',
         position: 'relative',
         overflow: 'visible',
+        backgroundColor: '#2A2A2A',
+        border: '1px solid rgba(255,255,255,0.06)',
+        '&:hover': {
+          borderColor: 'rgba(230, 81, 0, 0.3)',
+          boxShadow: '0 8px 30px rgba(230, 81, 0, 0.12)',
+        },
       }}
     >
-      {/* Accent top border */}
+      {/* Accent top border — orange gradient */}
       <Box
         sx={{
           height: 4,
-          background: 'linear-gradient(90deg, #1976D2, #42A5F5)',
+          background: 'linear-gradient(90deg, #E65100, #FF8F00)',
           borderRadius: '16px 16px 0 0',
         }}
       />
       <CardContent sx={{ p: 3, flexGrow: 1 }}>
         {/* Subject header */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 2 }}>
-          <MenuBookIcon sx={{ color: 'secondary.main', fontSize: 28, mt: 0.3 }} />
+          <MenuBookIcon sx={{ color: '#FF8F00', fontSize: 28, mt: 0.3 }} />
           <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3, color: '#FFFFFF' }}>
               {exam.subjectName}
             </Typography>
             <Chip
               label={exam.subjectCode}
               size="small"
-              color="secondary"
               variant="outlined"
-              sx={{ mt: 0.5, fontWeight: 600 }}
+              sx={{
+                mt: 0.5,
+                fontWeight: 600,
+                borderColor: '#FF8F00',
+                color: '#FFB300',
+              }}
             />
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 2 }} />
+        <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.06)' }} />
 
         {/* Details grid */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <CalendarMonthIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+            <CalendarMonthIcon sx={{ color: '#B0B0B0', fontSize: 20 }} />
             <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              <Typography variant="caption" sx={{ display: 'block', color: '#888' }}>
                 Date
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
                 {formatDate(exam.examDate)}
               </Typography>
             </Box>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <AccessTimeIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+            <AccessTimeIcon sx={{ color: '#B0B0B0', fontSize: 20 }} />
             <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              <Typography variant="caption" sx={{ display: 'block', color: '#888' }}>
                 Time
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
                 {formatTime(exam.examTime)}
               </Typography>
             </Box>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+            <LocationOnIcon sx={{ color: '#B0B0B0', fontSize: 20 }} />
             <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              <Typography variant="caption" sx={{ display: 'block', color: '#888' }}>
                 Building
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
                 {exam.building}
               </Typography>
             </Box>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <MeetingRoomIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+            <MeetingRoomIcon sx={{ color: '#B0B0B0', fontSize: 20 }} />
             <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              <Typography variant="caption" sx={{ display: 'block', color: '#888' }}>
                 Room
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
                 {exam.roomNumber}
               </Typography>
             </Box>

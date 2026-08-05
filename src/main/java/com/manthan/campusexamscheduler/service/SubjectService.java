@@ -49,7 +49,7 @@ public class SubjectService {
 
     public List<SubjectResponse> getAllSubjects() {
 
-        List<Subject> subjects = subjectRepository.findAll();
+        List<Subject> subjects = subjectRepository.findAllWithDepartment();
 
         return subjects.stream()
                 .map(subject -> SubjectResponse.builder()
@@ -65,7 +65,7 @@ public class SubjectService {
 
     public SubjectResponse getSubjectById(Long id) {
 
-        Subject subject = subjectRepository.findById(id)
+        Subject subject = subjectRepository.findByIdWithDepartment(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
 
         return SubjectResponse.builder()
@@ -80,8 +80,9 @@ public class SubjectService {
 
     public SubjectResponse updateSubject(Long id, SubjectRequest request) {
 
-        Subject subject = subjectRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
+        Subject subject = subjectRepository.findByIdWithDepartment(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Subject not found"));
 
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
@@ -105,8 +106,9 @@ public class SubjectService {
 
     public void deleteSubject(Long id) {
 
-        Subject subject = subjectRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
+        Subject subject = subjectRepository.findByIdWithDepartment(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Subject not found"));
 
         subjectRepository.delete(subject);
     }

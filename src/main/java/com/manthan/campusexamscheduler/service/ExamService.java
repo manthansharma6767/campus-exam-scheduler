@@ -58,7 +58,7 @@ public class ExamService {
     // GET ALL
     public List<ExamResponse> getAllExams() {
 
-        List<Exam> exams = examRepository.findAll();
+        List<Exam> exams = examRepository.findAllWithSubject();
 
         return exams.stream()
                 .map(exam -> ExamResponse.builder()
@@ -77,7 +77,7 @@ public class ExamService {
     // GET BY ID
     public ExamResponse getExamById(Long id) {
 
-        Exam exam = examRepository.findById(id)
+        Exam exam = examRepository.findByIdWithSubject(id)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Exam not found"));
 
@@ -96,7 +96,7 @@ public class ExamService {
     // UPDATE
     public ExamResponse updateExam(Long id, ExamRequest request) {
 
-        Exam exam = examRepository.findById(id)
+        Exam exam = examRepository.findByIdWithSubject(id)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Exam not found"));
 
@@ -127,7 +127,7 @@ public class ExamService {
     // DELETE
     public void deleteExamById(Long id) {
 
-        Exam exam = examRepository.findById(id)
+        Exam exam = examRepository.findByIdWithSubject(id)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Exam not found"));
 

@@ -2,16 +2,17 @@ package com.manthan.campusexamscheduler.service;
 
 import com.manthan.campusexamscheduler.dto.StudentRequest;
 import com.manthan.campusexamscheduler.dto.StudentResponse;
+import com.manthan.campusexamscheduler.dto.StudentScheduleResponse;
 import com.manthan.campusexamscheduler.entity.Department;
+import com.manthan.campusexamscheduler.entity.Exam;
 import com.manthan.campusexamscheduler.entity.Student;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.repository.DepartmentRepository;
+import com.manthan.campusexamscheduler.repository.ExamRepository;
 import com.manthan.campusexamscheduler.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import com.manthan.campusexamscheduler.dto.StudentScheduleResponse;
-import com.manthan.campusexamscheduler.entity.Exam;
-import com.manthan.campusexamscheduler.repository.ExamRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -61,6 +62,7 @@ public class StudentService {
     }
 
     // GET ALL
+    @Transactional(readOnly = true)
     public List<StudentResponse> getAllStudents() {
 
         List<Student> students = studentRepository.findAll();
@@ -79,6 +81,7 @@ public class StudentService {
     }
 
     // GET BY ID
+    @Transactional(readOnly = true)
     public StudentResponse getStudentById(Long id) {
 
         Student student = studentRepository.findById(id)
@@ -136,24 +139,23 @@ public class StudentService {
 
         studentRepository.delete(student);
     }
-    // find students with there enrollment number
+
+    // Student Schedule
+    @Transactional(readOnly = true)
     public List<StudentScheduleResponse> getStudentSchedule(
             String enrollmentNumber) {
 
-        // Find Student
         Student student = studentRepository
                 .findByEnrollmentNumber(enrollmentNumber)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Student not found"));
 
-        // Find Exams
         List<Exam> exams = examRepository
                 .findBySubject_DepartmentAndSubject_SemesterOrderByExamDateAscExamTimeAsc(
                         student.getDepartment(),
                         student.getSemester()
                 );
 
-        // Convert Entity -> DTO
         return exams.stream()
                 .map(exam -> StudentScheduleResponse.builder()
                         .subjectCode(exam.getSubject().getSubjectCode())

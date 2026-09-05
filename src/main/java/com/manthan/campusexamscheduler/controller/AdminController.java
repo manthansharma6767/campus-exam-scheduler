@@ -2,7 +2,6 @@ package com.manthan.campusexamscheduler.controller;
 
 import com.manthan.campusexamscheduler.dto.*;
 import com.manthan.campusexamscheduler.service.AdministratorService;
-import com.manthan.campusexamscheduler.service.SubjectService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,7 +35,7 @@ public class AdminController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<AdministratorResponse> updateAdmin(@PathVariable Long id , @RequestBody AdministratorRequest request) {
+    public ResponseEntity<AdministratorResponse> updateAdmin(@PathVariable Long id , @Valid @RequestBody AdministratorRequest request) {
 
         return new ResponseEntity<>(administratorService.updateAdmin(id , request),HttpStatus.OK);
     }

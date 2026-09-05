@@ -2,8 +2,6 @@ package com.manthan.campusexamscheduler.service;
 
 import com.manthan.campusexamscheduler.dto.*;
 import com.manthan.campusexamscheduler.entity.Administrator;
-import com.manthan.campusexamscheduler.entity.Department;
-import com.manthan.campusexamscheduler.entity.Student;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.repository.AdministratorRepository;
 import lombok.RequiredArgsConstructor;

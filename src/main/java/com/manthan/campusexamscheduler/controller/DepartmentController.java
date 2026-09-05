@@ -27,7 +27,7 @@ public class DepartmentController {
 
     @GetMapping()
     public ResponseEntity<List<DepartmentResponse>> findAllDepartments() {
-        return new ResponseEntity<>(departmentService.getAllDepartments() , HttpStatus.ACCEPTED);
+        return new ResponseEntity<>(departmentService.getAllDepartments() , HttpStatus.OK);
     }
 
     @GetMapping("/{id}")
@@ -37,7 +37,7 @@ public class DepartmentController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<DepartmentResponse> updateDepartment(@PathVariable Long id , @RequestBody DepartmentRequest request) {
+    public ResponseEntity<DepartmentResponse> updateDepartment(@PathVariable Long id , @Valid @RequestBody DepartmentRequest request) {
 
         return new ResponseEntity<>(departmentService.updateDepartment(id , request),HttpStatus.OK);
     }

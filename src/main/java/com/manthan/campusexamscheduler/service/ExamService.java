@@ -1,11 +1,7 @@
 package com.manthan.campusexamscheduler.service;
 import com.manthan.campusexamscheduler.dto.ExamRequest;
 import com.manthan.campusexamscheduler.dto.ExamResponse;
-import com.manthan.campusexamscheduler.dto.StudentRequest;
-import com.manthan.campusexamscheduler.dto.StudentResponse;
-import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Exam;
-import com.manthan.campusexamscheduler.entity.Student;
 import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.repository.ExamRepository;

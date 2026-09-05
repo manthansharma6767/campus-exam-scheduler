@@ -2,8 +2,6 @@ package com.manthan.campusexamscheduler.controller;
 
 import com.manthan.campusexamscheduler.dto.ExamRequest;
 import com.manthan.campusexamscheduler.dto.ExamResponse;
-import com.manthan.campusexamscheduler.dto.StudentRequest;
-import com.manthan.campusexamscheduler.dto.StudentResponse;
 import com.manthan.campusexamscheduler.service.ExamService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +36,7 @@ public class ExamController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ExamResponse> updateExam(@PathVariable Long id , @RequestBody ExamRequest request) {
+    public ResponseEntity<ExamResponse> updateExam(@PathVariable Long id , @Valid @RequestBody ExamRequest request) {
 
         return new ResponseEntity<>(examService.updateExam(id , request),HttpStatus.OK);
     }

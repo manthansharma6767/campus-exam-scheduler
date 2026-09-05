@@ -1,7 +1,6 @@
 package com.manthan.campusexamscheduler.controller;
 
 import com.manthan.campusexamscheduler.dto.*;
-import com.manthan.campusexamscheduler.service.StudentService;
 import com.manthan.campusexamscheduler.service.SubjectService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +35,7 @@ public class SubjectController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<SubjectResponse> updateSubject(@PathVariable Long id , @RequestBody SubjectRequest request) {
+    public ResponseEntity<SubjectResponse> updateSubject(@PathVariable Long id , @Valid @RequestBody SubjectRequest request) {
 
         return new ResponseEntity<>(subjectService.updateSubject(id , request),HttpStatus.OK);
     }

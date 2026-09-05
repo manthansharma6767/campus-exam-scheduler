@@ -1,14 +1,12 @@
 package com.manthan.campusexamscheduler.controller;
 
 import com.manthan.campusexamscheduler.dto.*;
-import com.manthan.campusexamscheduler.service.DepartmentService;
 import com.manthan.campusexamscheduler.service.StudentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.manthan.campusexamscheduler.dto.StudentScheduleResponse;
 
 import java.util.List;
 
@@ -36,7 +34,7 @@ public class StudentController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<StudentResponse> updateStudent(@PathVariable Long id , @RequestBody StudentRequest request) {
+    public ResponseEntity<StudentResponse> updateStudent(@PathVariable Long id , @Valid @RequestBody StudentRequest request) {
 
         return new ResponseEntity<>(studentService.updateStudent(id , request),HttpStatus.OK);
     }

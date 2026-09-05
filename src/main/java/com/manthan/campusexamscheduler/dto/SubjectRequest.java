@@ -1,7 +1,6 @@
 package com.manthan.campusexamscheduler.dto;
 
 
-import com.manthan.campusexamscheduler.entity.Department;
 import jakarta.validation.constraints.*;
 import lombok.*;
 

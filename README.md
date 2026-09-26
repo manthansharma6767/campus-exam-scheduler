@@ -2,10 +2,14 @@
 
 A full-stack web application designed to manage college examination schedules. The system allows administrators to manage departments, students, subjects, and examinations, while students can access their examination schedule using their enrollment number.
 
+---
+
 ## Live Application
 
 - **Frontend:** https://campus-exam-scheduler-frontend.vercel.app/
 - **Backend API:** https://campus-exam-scheduler.onrender.com
+
+---
 
 ## Project Overview
 
@@ -20,7 +24,9 @@ The application provides separate functionality for managing:
 - Student examination schedules
 - Authentication and authorization
 
-The frontend communicates with the Spring Boot backend through REST APIs.
+The React frontend communicates with the Spring Boot backend through REST APIs.
+
+---
 
 ## Key Features
 
@@ -82,9 +88,11 @@ The schedule contains:
 - Building
 - Room number
 
+---
+
 ## Authentication & Security
 
-The application uses Spring Security with JWT-based authentication.
+The application uses **Spring Security** with **JWT-based authentication**.
 
 ### Authentication Flow
 

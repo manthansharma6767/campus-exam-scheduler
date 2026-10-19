@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Repository
 public interface ExamRepository extends JpaRepository<Exam, Long> {
@@ -34,6 +36,11 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
             Department department,
             Integer semester
     );
+
+    boolean existsBySubject_SubjectIdAndExamDateAndExamTime(Long subjectId, LocalDate examDate, LocalTime examTime);
+
+    boolean existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamIdNot(
+            Long subjectId, LocalDate examDate, LocalTime examTime, Long examId);
 
 
 }

@@ -7,10 +7,12 @@ import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Exam;
 import com.manthan.campusexamscheduler.entity.Student;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
+import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.repository.DepartmentRepository;
 import com.manthan.campusexamscheduler.repository.ExamRepository;
 import com.manthan.campusexamscheduler.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,16 +25,21 @@ public class StudentService {
     private final StudentRepository studentRepository;
     private final DepartmentRepository departmentRepository;
     private final ExamRepository examRepository;
+    private final PasswordEncoder passwordEncoder;
 
     // CREATE
     public StudentResponse registerStudent(StudentRequest request) {
 
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException("Password is required when creating a student.");
+        }
+
         if (studentRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new DuplicateResourceException("A student with this email already exists.");
         }
 
         if (studentRepository.existsByEnrollmentNumber(request.getEnrollmentNumber())) {
-            throw new ResourceNotFoundException("Enrollment number already exists");
+            throw new DuplicateResourceException("Enrollment number already exists.");
         }
 
         Department department = departmentRepository.findById(request.getDepartmentId())
@@ -42,7 +49,7 @@ public class StudentService {
         Student student = Student.builder()
                 .name(request.getName())
                 .email(request.getEmail())
-                .password(request.getPassword())
+                .password(passwordEncoder.encode(request.getPassword()))
                 .enrollmentNumber(request.getEnrollmentNumber())
                 .semester(request.getSemester())
                 .department(department)
@@ -106,13 +113,25 @@ public class StudentService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Student not found"));
 
+        if (studentRepository.existsByEmailAndStudentIdNot(request.getEmail(), id)) {
+            throw new DuplicateResourceException("A student with this email already exists.");
+        }
+        if (studentRepository.existsByEnrollmentNumberAndStudentIdNot(request.getEnrollmentNumber(), id)) {
+            throw new DuplicateResourceException("Enrollment number already exists.");
+        }
+
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Department not found"));
 
         student.setName(request.getName());
         student.setEmail(request.getEmail());
-        student.setPassword(request.getPassword());
+
+        // Keep the current password when the edit form leaves the field blank.
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            student.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+
         student.setEnrollmentNumber(request.getEnrollmentNumber());
         student.setSemester(request.getSemester());
         student.setDepartment(department);

@@ -42,4 +42,6 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     );
 
     boolean existsBySubjectCode(String subjectCode);
+
+    boolean existsBySubjectCodeAndSubjectIdNot(String subjectCode, Long subjectId);
 }

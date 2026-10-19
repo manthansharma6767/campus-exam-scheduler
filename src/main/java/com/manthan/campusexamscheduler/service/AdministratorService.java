@@ -3,6 +3,7 @@ package com.manthan.campusexamscheduler.service;
 import com.manthan.campusexamscheduler.dto.*;
 import com.manthan.campusexamscheduler.entity.Administrator;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
+import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.repository.AdministratorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,8 +20,8 @@ public class AdministratorService {
     private final PasswordEncoder passwordEncoder;
 
     public AdministratorResponse registerAdmin(AdministratorRequest request) {
-        if(administratorRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email Exists");
+        if (administratorRepository.existsByEmail(request.getEmail())) {
+            throw new DuplicateResourceException("An administrator with this email already exists.");
         }
 
         Administrator administrator = Administrator.builder()
@@ -70,9 +71,13 @@ public class AdministratorService {
         Administrator administrator = administratorRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
 
+        if (administratorRepository.existsByEmailAndAdminIdNot(request.getEmail(), id)) {
+            throw new DuplicateResourceException("An administrator with this email already exists.");
+        }
+
         administrator.setName(request.getName());
         administrator.setEmail(request.getEmail());
-        administrator.setPassword(request.getPassword());
+        administrator.setPassword(passwordEncoder.encode(request.getPassword()));
 
         Administrator updatedAdmin = administratorRepository.save(administrator);
 

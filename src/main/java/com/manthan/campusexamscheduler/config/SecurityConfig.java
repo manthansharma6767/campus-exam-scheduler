@@ -70,6 +70,14 @@ public class SecurityConfig {
                                 "/api/students/*/schedule"
                         ).permitAll()
 
+                        // Swagger / OpenAPI (development convenience)
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/webjars/**"
+                        ).permitAll()
+
                         // Everything else requires login
                         .anyRequest().authenticated()
                 )

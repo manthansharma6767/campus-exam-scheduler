@@ -3,6 +3,7 @@ package com.manthan.campusexamscheduler.util;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -13,22 +14,24 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    private static final String SECRET_KEY =
-            "mysecretkeymysecretkeymysecretkeymysecretkey123456";
+    @Value("${JWT_SECRET:mysecretkeymysecretkeymysecretkeymysecretkey123456}")
+    private String secretKey;
+
+    // Token valid for 24 hours
+    private static final long EXPIRY_MS = 1000L * 60 * 60 * 24;
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(
-                SECRET_KEY.getBytes(StandardCharsets.UTF_8)
+                secretKey.getBytes(StandardCharsets.UTF_8)
         );
     }
 
     // Generate JWT
     public String generateToken(String email) {
-
         return Jwts.builder()
                 .subject(email)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60))
+                .expiration(new Date(System.currentTimeMillis() + EXPIRY_MS))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -64,7 +67,6 @@ public class JwtService {
 
     // Validate Token
     public boolean isTokenValid(String token, String email) {
-
         return extractUsername(token).equals(email)
                 && !isTokenExpired(token);
     }

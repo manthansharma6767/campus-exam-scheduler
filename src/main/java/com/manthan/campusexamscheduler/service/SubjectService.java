@@ -5,6 +5,7 @@ import com.manthan.campusexamscheduler.dto.SubjectResponse;
 import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
+import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.repository.DepartmentRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class SubjectService {
     public SubjectResponse createSubject(SubjectRequest request) {
 
         if (subjectRepository.existsBySubjectCode(request.getSubjectCode())) {
-            throw new ResourceNotFoundException("Subject code already exists");
+            throw new DuplicateResourceException("Subject code already exists.");
         }
 
         Department department = departmentRepository.findById(request.getDepartmentId())
@@ -83,6 +84,10 @@ public class SubjectService {
         Subject subject = subjectRepository.findByIdWithDepartment(id)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Subject not found"));
+
+        if (subjectRepository.existsBySubjectCodeAndSubjectIdNot(request.getSubjectCode(), id)) {
+            throw new DuplicateResourceException("Subject code already exists.");
+        }
 
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));

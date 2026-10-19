@@ -4,6 +4,7 @@ import com.manthan.campusexamscheduler.dto.ExamResponse;
 import com.manthan.campusexamscheduler.entity.Exam;
 import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
+import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.repository.ExamRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,11 @@ public class ExamService {
                 .findById(request.getSubjectId())
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Subject not found"));
+
+        if (examRepository.existsBySubject_SubjectIdAndExamDateAndExamTime(
+                subject.getSubjectId(), request.getExamDate(), request.getExamTime())) {
+            throw new DuplicateResourceException("An exam for this subject, date, and time already exists.");
+        }
 
         // DTO -> Entity
         Exam exam = Exam.builder()
@@ -99,6 +105,11 @@ public class ExamService {
         Subject subject = subjectRepository.findById(request.getSubjectId())
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Subject not found"));
+
+        if (examRepository.existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamIdNot(
+                subject.getSubjectId(), request.getExamDate(), request.getExamTime(), id)) {
+            throw new DuplicateResourceException("An exam for this subject, date, and time already exists.");
+        }
 
         exam.setExamDate(request.getExamDate());
         exam.setExamTime(request.getExamTime());

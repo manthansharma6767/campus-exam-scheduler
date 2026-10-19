@@ -106,13 +106,6 @@ export default function Navbar() {
     handleHistoryClose();
   };
 
-  const handleComingSoon = (feature) => {
-    setSnackbar({
-      open: true,
-      message: `${feature} feature coming soon!`,
-    });
-  };
-
   const adminItems = isLoggedIn
     ? [{ label: 'Dashboard', path: '/admin/dashboard', icon: <DashboardIcon /> }]
     : [{ label: 'Admin', path: '/admin/login', icon: <AdminPanelSettingsIcon /> }];
@@ -192,28 +185,28 @@ export default function Navbar() {
           <ListItemButton
             onClick={() => {
               setDrawerOpen(false);
-              handleComingSoon('Calendar');
+              navigate('/calendar');
             }}
             sx={{ mx: 1, borderRadius: 2, mb: 0.5 }}
           >
             <ListItemIcon sx={{ minWidth: 40, color: '#B0B0B0' }}>
               <CalendarMonthIcon />
             </ListItemIcon>
-            <ListItemText primary="Calendar (Soon)" />
+            <ListItemText primary="My Schedule" />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
           <ListItemButton
             onClick={() => {
               setDrawerOpen(false);
-              handleComingSoon('Contact');
+              setSnackbar({ open: true, message: 'Contact: Please reach out to your exam administration office.' });
             }}
             sx={{ mx: 1, borderRadius: 2, mb: 0.5 }}
           >
             <ListItemIcon sx={{ minWidth: 40, color: '#B0B0B0' }}>
               <EmailIcon />
             </ListItemIcon>
-            <ListItemText primary="Contact (Soon)" />
+            <ListItemText primary="Contact" />
           </ListItemButton>
         </ListItem>
         <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.08)' }} />
@@ -327,9 +320,9 @@ export default function Navbar() {
                 </IconButton>
               </Tooltip>
 
-              <Tooltip title="Calendar (Coming Soon)" arrow>
+              <Tooltip title="My Schedule" arrow>
                 <IconButton
-                  onClick={() => handleComingSoon('Calendar')}
+                  onClick={() => navigate('/calendar')}
                   sx={{
                     color: 'rgba(255,255,255,0.6)',
                     '&:hover': { color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.08)' },
@@ -344,7 +337,7 @@ export default function Navbar() {
                 <IconButton
                   onClick={handleHistoryClick}
                   sx={{
-                    color: Boolean(historyAnchor) ? '#FF8F00' : 'rgba(255,255,255,0.6)',
+                    color: historyAnchor ? '#FF8F00' : 'rgba(255,255,255,0.6)',
                     '&:hover': { color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.08)' },
                   }}
                   aria-label="Search History"
@@ -353,9 +346,9 @@ export default function Navbar() {
                 </IconButton>
               </Tooltip>
 
-              <Tooltip title="Contact (Coming Soon)" arrow>
+              <Tooltip title="Contact" arrow>
                 <IconButton
-                  onClick={() => handleComingSoon('Contact')}
+                  onClick={() => setSnackbar({ open: true, message: 'Contact: Please reach out to your exam administration office.' })}
                   sx={{
                     color: 'rgba(255,255,255,0.6)',
                     '&:hover': { color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.08)' },
@@ -371,12 +364,11 @@ export default function Navbar() {
           {/* Spacer for mobile */}
           {isMobile && <Box sx={{ flexGrow: 1 }} />}
 
-          {/* VIEW EXAMS button + Admin actions */}
+          {/* Public exam search + Admin actions */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {!isMobile && (
               <Button
-                component={Link}
-                to={isLoggedIn ? '/admin/dashboard' : '/admin/login'}
+                onClick={handleSearchClick}
                 variant="contained"
                 sx={{
                   background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)',
@@ -395,7 +387,7 @@ export default function Navbar() {
                   },
                 }}
               >
-                VIEW EXAMS
+                FIND MY EXAMS
               </Button>
             )}
             {isLoggedIn && !isMobile && (

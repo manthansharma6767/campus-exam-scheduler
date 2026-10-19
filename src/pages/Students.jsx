@@ -93,8 +93,13 @@ export default function Students() {
     if (!form.name.trim()) return 'Name is required';
     if (!form.email.trim()) return 'Email is required';
     if (!/\S+@\S+\.\S+/.test(form.email)) return 'Please enter a valid email';
-    if (!form.password.trim()) return 'Password is required';
-    if (form.password.trim().length < 8) return 'Password must be at least 8 characters';
+    // Password is required only when creating a new student
+    if (!editing) {
+      if (!form.password.trim()) return 'Password is required';
+      if (form.password.trim().length < 8) return 'Password must be at least 8 characters';
+    } else if (form.password.trim() && form.password.trim().length < 8) {
+      return 'New password must be at least 8 characters';
+    }
     if (!form.enrollmentNumber.trim()) return 'Enrollment number is required';
     if (!form.semester) return 'Semester is required';
     if (!form.departmentId) return 'Department is required';
@@ -109,11 +114,17 @@ export default function Students() {
       const payload = {
         name: form.name.trim(),
         email: form.email.trim(),
-        password: form.password.trim(),
         enrollmentNumber: form.enrollmentNumber.trim(),
         semester: parseInt(form.semester, 10),
         departmentId: parseInt(form.departmentId, 10),
       };
+      // Only send password if provided (required on create, optional on edit)
+      if (form.password.trim()) {
+        payload.password = form.password.trim();
+      } else if (!editing) {
+        // Shouldn't reach here (validate blocks it), but be safe
+        payload.password = form.password.trim();
+      }
       if (editing) {
         await api.put(`/api/students/${editing.studentId}`, payload);
         setSnackbar({ open: true, message: 'Student updated successfully', severity: 'success' });
@@ -226,9 +237,9 @@ export default function Students() {
               <TextField name="email" label="Email" type="email" value={form.email} onChange={handleChange}
                 placeholder="e.g. john@example.com" slotProps={{ htmlInput: { 'aria-label': 'Email address', maxLength: 100 } }} fullWidth />
               <TextField name="password" label="Password" type="password" value={form.password} onChange={handleChange}
-                placeholder={editing ? 'Enter new password' : 'Minimum 8 characters'}
-                helperText={editing ? 'A new password must be provided when updating' : ''}
-                slotProps={{ htmlInput: { 'aria-label': 'Password', maxLength: 255, minLength: 8 } }} fullWidth />
+                placeholder={editing ? 'Enter new password' : '8–72 characters'}
+                helperText={editing ? 'Leave blank to keep the current password' : ''}
+                slotProps={{ htmlInput: { 'aria-label': 'Password', maxLength: 72, minLength: 8 } }} fullWidth />
               <TextField name="enrollmentNumber" label="Enrollment Number" value={form.enrollmentNumber} onChange={handleChange}
                 placeholder="e.g. RBU2024001" slotProps={{ htmlInput: { 'aria-label': 'Enrollment number', maxLength: 255 } }} fullWidth />
               <TextField name="semester" label="Semester" select value={form.semester} onChange={handleChange}

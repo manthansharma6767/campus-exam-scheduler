@@ -185,7 +185,7 @@ export default function AdminLogin() {
                       </InputAdornment>
                     ),
                   },
-                  htmlInput: { 'aria-label': 'Password' },
+                  htmlInput: { 'aria-label': 'Password', maxLength: 72 },
                 }}
                 sx={{ mb: 3 }}
                 autoComplete="current-password"

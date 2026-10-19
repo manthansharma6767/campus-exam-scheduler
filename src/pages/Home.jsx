@@ -1,12 +1,10 @@
 import { useRef } from 'react';
-import { Link } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Button from '@mui/material/Button';
 import Fade from '@mui/material/Fade';
 import SearchBox from '../components/SearchBox';
-import rbuLogo from '../assets/rbu-logo.png';
 import handPencil from '../assets/hand-pencil.png';
 
 export default function Home() {
@@ -234,19 +232,6 @@ export default function Home() {
                 </Typography>
 
                 <Typography
-                  variant="body1"
-                  sx={{
-                    opacity: 0.75,
-                    lineHeight: 1.8,
-                    mb: 2,
-                    maxWidth: 600,
-                  }}
-                >
-                  To view your exam schedule, simply enter your enrollment number and hit search.
-                  You'll see all your upcoming exams with dates, times, and room assignments.
-                </Typography>
-
-                <Typography
                   variant="body2"
                   sx={{
                     opacity: 0.65,
@@ -255,8 +240,7 @@ export default function Home() {
                     maxWidth: 600,
                   }}
                 >
-                  To find your schedule, simply enter your enrollment number below. 
-                  Once you are done, go to the results section and view your personalized schedule!
+                  Enter your enrollment number to see your upcoming exams, including dates, times, and room assignments.
                 </Typography>
 
                 {/* Search Box */}

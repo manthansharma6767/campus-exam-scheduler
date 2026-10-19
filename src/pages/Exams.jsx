@@ -27,6 +27,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import QuizIcon from '@mui/icons-material/Quiz';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Loading from '../components/Loading';
 import ConfirmDialog from '../components/ConfirmDialog';
 import api from '../services/api';
@@ -60,6 +61,7 @@ export default function Exams() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [submitting, setSubmitting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -154,6 +156,24 @@ export default function Exams() {
     }
   };
 
+  const handleTimetableImport = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const body = new FormData();
+    body.append('file', file);
+    setImporting(true);
+    try {
+      const response = await api.post('/api/exams/import', body);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      fetchData();
+    } catch (err) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Timetable import failed', severity: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <Fade in timeout={600}>
       <Box>
@@ -174,12 +194,21 @@ export default function Exams() {
 
         <Box sx={{ background: '#1A1A1A', minHeight: '60vh' }}>
           <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
+              <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} disabled={importing}
+                sx={{ borderColor: '#FF8F00', color: '#FFB300', '&:hover': { borderColor: '#FFB300' } }}>
+                {importing ? 'Importing...' : 'Import timetable'}
+                <input hidden type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleTimetableImport} />
+              </Button>
               <Button id="add-exam-button" variant="contained" startIcon={<AddIcon />} onClick={openAdd}
                 sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
                 Add Exam
               </Button>
             </Box>
+
+            <Typography variant="body2" sx={{ color: '#B0B0B0', textAlign: 'right', mb: 2 }}>
+              Excel headers: Subject Code, Date, Time, Building, Room. PDFs need a selectable text table separated by |, tabs, commas, or semicolons.
+            </Typography>
 
             {loading ? (
               <Loading message="Loading exams..." />

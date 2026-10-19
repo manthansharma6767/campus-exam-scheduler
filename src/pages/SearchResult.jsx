@@ -5,20 +5,25 @@ import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Fade from '@mui/material/Fade';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
+import DownloadIcon from '@mui/icons-material/Download';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ExamCard from '../components/ExamCard';
 import Loading from '../components/Loading';
 import api from '../services/api';
+import { downloadCalendar, getExamKey, readPersonalSchedule, removeExamFromPersonalSchedule, saveExamToPersonalSchedule } from '../utils/personalSchedule';
 
 export default function SearchResult() {
   const { enrollmentNumber } = useParams();
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedKeys, setSelectedKeys] = useState(new Set());
 
   useEffect(() => {
     const fetchSchedule = async () => {
@@ -29,6 +34,11 @@ export default function SearchResult() {
           `/api/students/${encodeURIComponent(enrollmentNumber)}/schedule`
         );
         setExams(response.data);
+        const currentEnrollment = String(enrollmentNumber || '').trim().toUpperCase();
+        const saved = readPersonalSchedule().filter(
+          (exam) => String(exam.enrollmentNumber || '').trim().toUpperCase() === currentEnrollment
+        );
+        setSelectedKeys(new Set(saved.map((exam) => getExamKey(exam, enrollmentNumber))));
       } catch (err) {
         if (err.response && err.response.status === 404) {
           setError('student_not_found');
@@ -42,6 +52,29 @@ export default function SearchResult() {
 
     fetchSchedule();
   }, [enrollmentNumber]);
+
+  const toggleExam = (exam) => {
+    const key = getExamKey(exam, enrollmentNumber);
+    const next = new Set(selectedKeys);
+    if (next.has(key)) {
+      removeExamFromPersonalSchedule(exam, enrollmentNumber);
+      next.delete(key);
+    } else {
+      saveExamToPersonalSchedule(exam, enrollmentNumber);
+      next.add(key);
+    }
+    setSelectedKeys(next);
+  };
+
+  const selectAll = () => {
+    exams.forEach((exam) => saveExamToPersonalSchedule(exam, enrollmentNumber));
+    setSelectedKeys(new Set(exams.map((exam) => getExamKey(exam, enrollmentNumber))));
+  };
+
+  const clearSelection = () => {
+    exams.forEach((exam) => removeExamFromPersonalSchedule(exam, enrollmentNumber));
+    setSelectedKeys(new Set());
+  };
 
   if (loading) {
     return (
@@ -179,13 +212,25 @@ export default function SearchResult() {
             {/* Exam Results */}
             {!error && exams.length > 0 && (
               <>
-                <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, color: '#FFB300' }}>
-                  {exams.length} Exam{exams.length !== 1 ? 's' : ''} Found
-                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 600, color: '#FFB300' }}>
+                    {exams.length} Exam{exams.length !== 1 ? 's' : ''} Found · {selectedKeys.size} in My Schedule
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    <Button size="small" onClick={selectAll}>Add all</Button>
+                    <Button size="small" onClick={clearSelection} disabled={selectedKeys.size === 0}>Clear</Button>
+                    <Button component={Link} to="/calendar" size="small" startIcon={<CalendarMonthIcon />}>My Schedule</Button>
+                    <Button size="small" variant="contained" startIcon={<DownloadIcon />} disabled={selectedKeys.size === 0}
+                      onClick={() => downloadCalendar(exams.filter((exam) => selectedKeys.has(getExamKey(exam, enrollmentNumber))))}>
+                      Export selected
+                    </Button>
+                  </Stack>
+                </Stack>
                 <Grid container spacing={3}>
-                  {exams.map((exam, index) => (
-                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={index}>
-                      <ExamCard exam={exam} />
+                  {exams.map((exam) => (
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={getExamKey(exam, enrollmentNumber)}>
+                      <ExamCard exam={exam} selected={selectedKeys.has(getExamKey(exam, enrollmentNumber))}
+                        onToggle={() => toggleExam(exam)} enrollmentNumber={enrollmentNumber} />
                     </Grid>
                   ))}
                 </Grid>

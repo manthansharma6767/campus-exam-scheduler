@@ -12,8 +12,9 @@ const api = axios.create({
 // Public endpoints that do NOT require authentication
 const PUBLIC_PATTERNS = [
   /^\/api\/students\/[^/]+\/schedule$/,
-  /^\/api\/auth\//,
+  /^\/api\/auth\//,  // covers /api/auth/login and /api/auth/register
 ];
+
 
 function isPublicEndpoint(url) {
   return PUBLIC_PATTERNS.some((pattern) => pattern.test(url));
@@ -22,6 +23,9 @@ function isPublicEndpoint(url) {
 // Request interceptor — attach JWT for admin routes
 api.interceptors.request.use(
   (config) => {
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      config.headers.delete('Content-Type');
+    }
     if (!isPublicEndpoint(config.url)) {
       const token = localStorage.getItem('token');
       if (token) {
@@ -40,7 +44,7 @@ api.interceptors.response.use(
     if (
       error.response &&
       error.response.status === 401 &&
-      !isPublicEndpoint(error.config.url)
+      !isPublicEndpoint(error.config?.url)
     ) {
       localStorage.removeItem('token');
       window.location.href = '/admin/login';

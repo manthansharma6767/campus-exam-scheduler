@@ -1,16 +1,34 @@
-# React + Vite
+# RBU Campus Exam Scheduler — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 single-page application built with Vite and Material UI.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Install Node.js and npm.
+2. From this directory, run `npm install`.
+3. Start the backend described in the backend repository README.
+4. Run `npm run dev` and open the local URL printed by Vite.
 
-## React Compiler
+The API defaults to `http://localhost:8080`. To point the frontend at another backend, create a `.env.local` file in this directory with:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```dotenv
+VITE_API_BASE_URL=https://your-backend.example.com
+```
 
-## Expanding the Oxlint configuration
+Do not include database credentials or server secrets in `VITE_*` variables; those values are bundled into the public frontend.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Features
+
+- Public student schedule lookup by enrollment number.
+- Select exams into **My Schedule**, keep selections in the current browser, and export them as an `.ics` calendar.
+- Admin login, first-admin setup, dashboard, and department, subject, student, and exam management.
+- Admin timetable import for `.xls`, `.xlsx`, and text-based `.pdf` files.
+
+For timetable column requirements, data setup order, and backend configuration, see the backend README.
+
+## Commands
+
+- `npm run dev` — start the development server.
+- `npm run lint` — check source lint rules.
+- `npm run build` — create the production bundle in `dist/`.
+- `npm run preview` — serve the production bundle locally.

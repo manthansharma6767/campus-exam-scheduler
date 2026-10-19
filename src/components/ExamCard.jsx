@@ -9,6 +9,8 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -30,7 +32,7 @@ function formatTime(timeStr) {
   return `${h12}:${minutes} ${ampm}`;
 }
 
-export default function ExamCard({ exam }) {
+export default function ExamCard({ exam, selected = false, onToggle, enrollmentNumber }) {
   return (
     <Card
       sx={{
@@ -130,6 +132,16 @@ export default function ExamCard({ exam }) {
           </Box>
         </Box>
       </CardContent>
+      {onToggle && (
+        <Box sx={{ px: 2, pb: 1 }}>
+          <FormControlLabel
+            control={<Checkbox checked={selected} onChange={onToggle} sx={{ color: '#FF8F00', '&.Mui-checked': { color: '#FF8F00' } }} />}
+            label={selected ? 'In my schedule' : 'Add to my schedule'}
+            slotProps={{ typography: { sx: { color: '#E0E0E0' } } }}
+          />
+          {enrollmentNumber && <Typography variant="caption" sx={{ display: 'block', color: '#888', pl: 1.5 }}>Enrollment {enrollmentNumber}</Typography>}
+        </Box>
+      )}
     </Card>
   );
 }

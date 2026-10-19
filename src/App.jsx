@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -6,14 +7,19 @@ import theme from './theme/theme';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
-import Home from './pages/Home';
-import SearchResult from './pages/SearchResult';
-import AdminLogin from './pages/AdminLogin';
-import Dashboard from './pages/Dashboard';
-import Departments from './pages/Departments';
-import Subjects from './pages/Subjects';
-import Students from './pages/Students';
-import Exams from './pages/Exams';
+import Loading from './components/Loading';
+
+const Home = lazy(() => import('./pages/Home'));
+const SearchResult = lazy(() => import('./pages/SearchResult'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Departments = lazy(() => import('./pages/Departments'));
+const Subjects = lazy(() => import('./pages/Subjects'));
+const Students = lazy(() => import('./pages/Students'));
+const Exams = lazy(() => import('./pages/Exams'));
+const AdminSetup = lazy(() => import('./pages/AdminSetup'));
+const MySchedule = lazy(() => import('./pages/MySchedule'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 export default function App() {
   return (
@@ -30,56 +36,61 @@ export default function App() {
           <Navbar />
 
           <Box component="main" sx={{ flexGrow: 1 }}>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Home />} />
-              <Route path="/search/:enrollmentNumber" element={<SearchResult />} />
+            <Suspense fallback={<Loading message="Loading page..." />}>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Home />} />
+                <Route path="/search/:enrollmentNumber" element={<SearchResult />} />
+                <Route path="/calendar" element={<MySchedule />} />
 
-              {/* Auth Route */}
-              <Route path="/admin/login" element={<AdminLogin />} />
+                {/* Auth Route */}
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin/setup" element={<AdminSetup />} />
 
-              {/* Protected Admin Routes */}
-              <Route
-                path="/admin/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/departments"
-                element={
-                  <ProtectedRoute>
-                    <Departments />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/subjects"
-                element={
-                  <ProtectedRoute>
-                    <Subjects />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/students"
-                element={
-                  <ProtectedRoute>
-                    <Students />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/exams"
-                element={
-                  <ProtectedRoute>
-                    <Exams />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
+                {/* Protected Admin Routes */}
+                <Route
+                  path="/admin/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/departments"
+                  element={
+                    <ProtectedRoute>
+                      <Departments />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/subjects"
+                  element={
+                    <ProtectedRoute>
+                      <Subjects />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/students"
+                  element={
+                    <ProtectedRoute>
+                      <Students />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/exams"
+                  element={
+                    <ProtectedRoute>
+                      <Exams />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </Box>
 
           <Footer />

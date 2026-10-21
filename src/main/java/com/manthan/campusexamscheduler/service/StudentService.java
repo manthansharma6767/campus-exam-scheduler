@@ -107,6 +107,7 @@ public class StudentService {
     }
 
     // UPDATE
+    @Transactional
     public StudentResponse updateStudent(Long id, StudentRequest request) {
 
         Student student = studentRepository.findById(id)

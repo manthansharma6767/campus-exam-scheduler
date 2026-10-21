@@ -9,6 +9,7 @@ import com.manthan.campusexamscheduler.repository.ExamRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -96,6 +97,7 @@ public class ExamService {
     }
 
     // UPDATE
+    @Transactional
     public ExamResponse updateExam(Long id, ExamRequest request) {
 
         Exam exam = examRepository.findByIdWithSubject(id)

@@ -10,6 +10,7 @@ import com.manthan.campusexamscheduler.repository.DepartmentRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -79,6 +80,7 @@ public class SubjectService {
                 .build();
     }
 
+    @Transactional
     public SubjectResponse updateSubject(Long id, SubjectRequest request) {
 
         Subject subject = subjectRepository.findByIdWithDepartment(id)

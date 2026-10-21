@@ -131,10 +131,16 @@ Protected API
 
 Requirements: Java 17+, Maven (or the included Maven wrapper), Node.js, npm, and MySQL 8+.
 
+### Repository layout
+
+- The Spring Boot backend is at the repository root.
+- The React/Vite frontend is in `frontend/`.
+- Run the backend and frontend in separate terminal windows.
+
 1. Use a MySQL 8 database (create `campus_exam_scheduler` locally, or use your hosted database).
 2. In the backend environment, set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`. The URL must be a JDBC URL (`jdbc:mysql://...`), not a `mysql://` service URI. For an SSL-only hosted MySQL service, use `jdbc:mysql://<host>:<port>/<database>?sslMode=REQUIRED&serverTimezone=UTC`; set the username and rotated password in their separate environment variables. A saved MySQL Workbench connection does not configure the Spring backend.
-3. Start the backend from PowerShell with `./mvnw.cmd spring-boot:run` (set `JAVA_HOME` to a Java 17 installation if needed).
-4. In the frontend directory, run `npm install`, then `npm run dev`. Set `VITE_API_BASE_URL` to the backend URL if it is not `http://localhost:8080`.
+3. From the repository root, start the backend in PowerShell with `./mvnw.cmd spring-boot:run` (set `JAVA_HOME` to a Java 17 installation if needed).
+4. In a second terminal, run `cd frontend`, `npm install`, then `npm run dev`. Set `VITE_API_BASE_URL` to the backend URL if it is not `http://localhost:8080`.
 5. Set `CORS_ALLOWED_ORIGINS` to the frontend origin (comma-separated if there are several). Before creating the first administrator, set a random `ADMIN_SETUP_TOKEN` in the backend environment and open `/admin/setup` in the frontend.
 
 The application creates and updates its tables with Hibernate. Keep the database credentials, `ADMIN_SETUP_TOKEN`, and a strong `JWT_SECRET` in environment variables; do not put live credentials in this repository.

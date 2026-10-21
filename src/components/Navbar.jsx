@@ -416,13 +416,15 @@ export default function Navbar() {
         anchorEl={historyAnchor}
         open={Boolean(historyAnchor)}
         onClose={handleHistoryClose}
-        PaperProps={{
-          sx: {
-            backgroundColor: '#242424',
-            color: '#FFFFFF',
-            border: '1px solid rgba(255,255,255,0.1)',
-            minWidth: 220,
-            mt: 1,
+        slotProps={{
+          paper: {
+            sx: {
+              backgroundColor: '#242424',
+              color: '#FFFFFF',
+              border: '1px solid rgba(255,255,255,0.1)',
+              minWidth: 220,
+              mt: 1,
+            },
           },
         }}
       >
@@ -479,10 +481,12 @@ export default function Navbar() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         ModalProps={{ keepMounted: true }}
-        PaperProps={{
-          sx: {
-            backgroundColor: '#1A1A1A',
-            color: '#FFFFFF',
+        slotProps={{
+          paper: {
+            sx: {
+              backgroundColor: '#1A1A1A',
+              color: '#FFFFFF',
+            },
           },
         }}
       >

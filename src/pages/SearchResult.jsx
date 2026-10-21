@@ -212,11 +212,19 @@ export default function SearchResult() {
             {/* Exam Results */}
             {!error && exams.length > 0 && (
               <>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  sx={{
+                    mb: 3,
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'stretch', sm: 'center' },
+                  }}
+                >
                   <Typography variant="h5" sx={{ fontWeight: 600, color: '#FFB300' }}>
                     {exams.length} Exam{exams.length !== 1 ? 's' : ''} Found · {selectedKeys.size} in My Schedule
                   </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                     <Button size="small" onClick={selectAll}>Add all</Button>
                     <Button size="small" onClick={clearSelection} disabled={selectedKeys.size === 0}>Clear</Button>
                     <Button component={Link} to="/calendar" size="small" startIcon={<CalendarMonthIcon />}>My Schedule</Button>

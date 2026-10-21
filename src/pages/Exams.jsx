@@ -207,7 +207,7 @@ export default function Exams() {
             </Box>
 
             <Typography variant="body2" sx={{ color: '#B0B0B0', textAlign: 'right', mb: 2 }}>
-              Excel headers: Subject Code, Date, Time, Building, Room. PDFs need a selectable text table separated by |, tabs, commas, or semicolons.
+              Excel headers: Subject Code, Date, Time, Building, Room. Text-based PDFs support aligned rows and date-by-course matrices; missing venues import as “Not assigned”. Scanned/image-only PDFs need OCR first.
             </Typography>
 
             {loading ? (

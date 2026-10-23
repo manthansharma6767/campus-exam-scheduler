@@ -12,6 +12,8 @@ const api = axios.create({
 // Public endpoints that do NOT require authentication
 const PUBLIC_PATTERNS = [
   /^\/api\/students\/[^/]+\/schedule$/,
+  /^\/api\/seating\/plans\/?$/,
+  /^\/api\/seating\/plans\/\d+\/roll\/[^/]+$/,
   /^\/api\/auth\//,  // covers /api/auth/login and /api/auth/register
 ];
 

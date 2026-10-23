@@ -24,6 +24,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
 import SearchIcon from '@mui/icons-material/Search';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ChairIcon from '@mui/icons-material/Chair';
 import HistoryIcon from '@mui/icons-material/History';
 import EmailIcon from '@mui/icons-material/Email';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -199,6 +200,20 @@ export default function Navbar() {
           <ListItemButton
             onClick={() => {
               setDrawerOpen(false);
+              navigate('/seating');
+            }}
+            sx={{ mx: 1, borderRadius: 2, mb: 0.5 }}
+          >
+            <ListItemIcon sx={{ minWidth: 40, color: '#B0B0B0' }}>
+              <ChairIcon />
+            </ListItemIcon>
+            <ListItemText primary="Find My Seat" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={() => {
+              setDrawerOpen(false);
               setSnackbar({ open: true, message: 'Contact: Please reach out to your exam administration office.' });
             }}
             sx={{ mx: 1, borderRadius: 2, mb: 0.5 }}
@@ -330,6 +345,19 @@ export default function Navbar() {
                   aria-label="Calendar"
                 >
                   <CalendarMonthIcon />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Find My Seat" arrow>
+                <IconButton
+                  onClick={() => navigate('/seating')}
+                  sx={{
+                    color: location.pathname === '/seating' ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                    '&:hover': { color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.08)' },
+                  }}
+                  aria-label="Find My Seat"
+                >
+                  <ChairIcon />
                 </IconButton>
               </Tooltip>
 

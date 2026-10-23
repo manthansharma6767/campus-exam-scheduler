@@ -12,6 +12,7 @@ import com.manthan.campusexamscheduler.service.DepartmentService;
 import com.manthan.campusexamscheduler.service.ExamService;
 import com.manthan.campusexamscheduler.service.StudentService;
 import com.manthan.campusexamscheduler.service.SubjectService;
+import com.manthan.campusexamscheduler.service.SeatingPlanService;
 import com.manthan.campusexamscheduler.service.TimetableImportService;
 import com.manthan.campusexamscheduler.util.JwtService;
 import org.apache.poi.ss.usermodel.Row;
@@ -77,6 +78,9 @@ class SchedulerWorkflowIntegrationTest {
 
     @Autowired
     private ExamService examService;
+
+    @Autowired
+    private SeatingPlanService seatingPlanService;
 
     @Autowired
     private TimetableImportService timetableImportService;
@@ -217,6 +221,32 @@ class SchedulerWorkflowIntegrationTest {
                         && exam.getExamTime().equals(LocalTime.of(9, 30))));
     }
 
+    @Test
+    void importsAndLooksUpSeatsFromPositionedPdfAndReplacesDuplicatePlan() throws Exception {
+        MockMultipartFile seatingPdf = new MockMultipartFile(
+                "file", "5th-sem-seating.pdf", MediaType.APPLICATION_PDF_VALUE, seatingPdfBytes());
+
+        var imported = seatingPlanService.importPdf(seatingPdf, null);
+
+        assertEquals("Sessional Test 1", imported.getPlan().getTitle());
+        assertEquals("Department of Computer Science", imported.getPlan().getDepartmentName());
+        assertEquals(5, imported.getPlan().getSemester());
+        assertEquals(4, imported.getImportedSeats());
+        assertEquals(1, imported.getPlan().getRoomCount());
+
+        var seat = seatingPlanService.findSeat(imported.getPlan().getSeatingPlanId(), "a1-4");
+        assertEquals("A1-4", seat.getRollNumber());
+        assertEquals("A1", seat.getSection());
+        assertEquals("DT-101", seat.getRoomNumber());
+        assertEquals(1, seat.getRowNumber());
+        assertEquals(2, seat.getColumnNumber());
+
+        var replaced = seatingPlanService.importPdf(seatingPdf, null);
+        assertTrue(replaced.isReplacedExistingPlan());
+        assertEquals(imported.getPlan().getSeatingPlanId(), replaced.getPlan().getSeatingPlanId());
+        assertEquals(4, replaced.getPlan().getSeatCount());
+    }
+
     private ExamRequest examRequest(Long subjectId, LocalDate date, LocalTime time) {
         return ExamRequest.builder()
                 .examDate(date)
@@ -268,6 +298,26 @@ class SchedulerWorkflowIntegrationTest {
                 draw(content, font, page, "Course Code", 250, 195);
                 draw(content, font, page, "24CS01TH0501", 50, 215);
                 draw(content, font, page, "24CS01TH0502", 250, 215);
+            }
+            document.save(output);
+            return output.toByteArray();
+        }
+    }
+
+    private byte[] seatingPdfBytes() throws Exception {
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                PDType1Font font = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+                draw(content, font, page, "Department of Computer Science", 35, 60);
+                draw(content, font, page, "5th Semester", 35, 80);
+                draw(content, font, page, "Sessional Test 1", 35, 100);
+                draw(content, font, page, "Class Room No: DT-101", 35, 130);
+                draw(content, font, page, "A1-1", 80, 200);
+                draw(content, font, page, "A1-2", 230, 200);
+                draw(content, font, page, "A1-3", 80, 230);
+                draw(content, font, page, "A1-4", 230, 230);
             }
             document.save(output);
             return output.toByteArray();

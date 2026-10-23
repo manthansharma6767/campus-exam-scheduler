@@ -19,6 +19,8 @@ const Students = lazy(() => import('./pages/Students'));
 const Exams = lazy(() => import('./pages/Exams'));
 const AdminSetup = lazy(() => import('./pages/AdminSetup'));
 const MySchedule = lazy(() => import('./pages/MySchedule'));
+const SeatingLookup = lazy(() => import('./pages/SeatingLookup'));
+const SeatingPlans = lazy(() => import('./pages/SeatingPlans'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 export default function App() {
@@ -42,6 +44,7 @@ export default function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/search/:enrollmentNumber" element={<SearchResult />} />
                 <Route path="/calendar" element={<MySchedule />} />
+                <Route path="/seating" element={<SeatingLookup />} />
 
                 {/* Auth Route */}
                 <Route path="/admin/login" element={<AdminLogin />} />
@@ -85,6 +88,14 @@ export default function App() {
                   element={
                     <ProtectedRoute>
                       <Exams />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/seating"
+                  element={
+                    <ProtectedRoute>
+                      <SeatingPlans />
                     </ProtectedRoute>
                   }
                 />

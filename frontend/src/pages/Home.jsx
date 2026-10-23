@@ -1,10 +1,12 @@
 import { useRef } from 'react';
+import { Link } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Button from '@mui/material/Button';
 import Fade from '@mui/material/Fade';
 import SearchBox from '../components/SearchBox';
+import ChairIcon from '@mui/icons-material/Chair';
 import handPencil from '../assets/hand-pencil.png';
 
 export default function Home() {
@@ -247,6 +249,9 @@ export default function Home() {
                 <Box sx={{ mb: 4 }}>
                   <SearchBox />
                 </Box>
+                <Button component={Link} to="/seating" variant="outlined" startIcon={<ChairIcon />} sx={{ borderColor: 'rgba(255,143,0,0.5)', color: '#FFB300' }}>
+                  Find my seat by roll number
+                </Button>
               </Box>
             </Fade>
           </Container>

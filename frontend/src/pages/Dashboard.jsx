@@ -11,6 +11,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PeopleIcon from '@mui/icons-material/People';
 import QuizIcon from '@mui/icons-material/Quiz';
+import ChairIcon from '@mui/icons-material/Chair';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 
@@ -42,6 +43,13 @@ const dashboardCards = [
     icon: QuizIcon,
     path: '/admin/exams',
     color: '#BF360C',
+  },
+  {
+    title: 'Seating Plans',
+    description: 'Import room seating charts and let students look up their room and seat by roll number.',
+    icon: ChairIcon,
+    path: '/admin/seating',
+    color: '#7E57C2',
   },
 ];
 
@@ -87,7 +95,7 @@ export default function Dashboard() {
                 gridTemplateColumns: {
                   xs: '1fr',
                   sm: 'repeat(2, 1fr)',
-                  lg: 'repeat(4, 1fr)',
+                  lg: 'repeat(3, 1fr)',
                 },
                 gap: 3,
               }}

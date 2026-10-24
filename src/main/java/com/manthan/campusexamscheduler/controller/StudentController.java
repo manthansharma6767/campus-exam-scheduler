@@ -2,11 +2,14 @@ package com.manthan.campusexamscheduler.controller;
 
 import com.manthan.campusexamscheduler.dto.*;
 import com.manthan.campusexamscheduler.service.StudentService;
+import com.manthan.campusexamscheduler.service.StudentImportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -16,6 +19,12 @@ import java.util.List;
 public class StudentController {
 
     private final StudentService studentService;
+    private final StudentImportService studentImportService;
+
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<StudentImportResponse> importStudents(@RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(studentImportService.importStudents(file));
+    }
 
     @PostMapping
     public ResponseEntity<StudentResponse> createStudent(

@@ -13,6 +13,7 @@ A full-stack application for managing college examination schedules. Administrat
 
 - Create the first administrator through a token-protected setup flow.
 - Manage departments, subjects, students, and exams.
+- Import student rosters from CSV or Excel, including roll/enrollment numbers.
 - Import exam timetables from Excel (`.xls`, `.xlsx`) and text-based PDF files.
 - Validate imported rows against existing subject codes and skip duplicate exams.
 - Protect administrative routes with Spring Security and JWT authentication.
@@ -117,6 +118,12 @@ For row-based files, use one exam per row with these columns:
 Subject codes must already exist in Subject Management. Excel imports read the first worksheet; a title above the header is allowed. PDFs must contain selectable text and can use aligned exam rows or date-by-course matrices. Missing venues are saved as **Not assigned**.
 
 The import is validated as a single transaction. If a row is invalid or references an unknown subject, the import is rejected and no rows are saved. Existing exams with the same subject, date, and time are skipped to prevent duplicates when a timetable is uploaded again.
+
+## Importing students
+
+In **Student Management**, choose **Import Students** and upload a CSV, XLS, or XLSX file. Excel imports read the first worksheet. The header row must include `Name`, `Email`, `Password`, `Roll Number` (or `Enrollment Number`), `Semester`, and `Department` (department name or ID). A CSV template is available in the import dialog. Department names must match an existing department. Passwords are hashed before they are stored.
+
+Rows with an existing or repeated email/roll number are skipped. If another row is invalid, the import is rejected as a whole and no students are saved. Supported semester values are 1 through 8.
 
 ## Student schedules and calendar export
 

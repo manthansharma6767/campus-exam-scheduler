@@ -26,6 +26,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PeopleIcon from '@mui/icons-material/People';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Loading from '../components/Loading';
 import ConfirmDialog from '../components/ConfirmDialog';
 import api from '../services/api';
@@ -44,6 +45,10 @@ export default function Students() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [submitting, setSubmitting] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importError, setImportError] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -154,6 +159,41 @@ export default function Students() {
     }
   };
 
+  const downloadStudentTemplate = () => {
+    const template = new Blob(
+      ['Name,Email,Password,Roll Number,Semester,Department\r\n'],
+      { type: 'text/csv;charset=utf-8' }
+    );
+    const url = URL.createObjectURL(template);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'student-import-template.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      setImportError('Choose a CSV or Excel file first.');
+      return;
+    }
+    setImporting(true);
+    setImportError('');
+    try {
+      const data = new FormData();
+      data.append('file', importFile);
+      const response = await api.post('/api/students/import', data);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      setImportDialogOpen(false);
+      setImportFile(null);
+      fetchData();
+    } catch (err) {
+      setImportError(err.response?.data?.message || 'Student import failed. Check the file and try again.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <Fade in timeout={600}>
       <Box>
@@ -174,7 +214,12 @@ export default function Students() {
 
         <Box sx={{ background: '#1A1A1A', minHeight: '60vh' }}>
           <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
+              <Button id="import-students-button" variant="outlined" startIcon={<UploadFileIcon />}
+                onClick={() => { setImportError(''); setImportDialogOpen(true); }}
+                sx={{ color: '#FFB74D', borderColor: 'rgba(255,183,77,0.5)', '&:hover': { borderColor: '#FFB74D', backgroundColor: 'rgba(255,183,77,0.08)' } }}>
+                Import Students
+              </Button>
               <Button id="add-student-button" variant="contained" startIcon={<AddIcon />} onClick={openAdd}
                 sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
                 Add Student
@@ -225,6 +270,46 @@ export default function Students() {
             )}
           </Container>
         </Box>
+
+        <Dialog open={importDialogOpen} onClose={() => !importing && setImportDialogOpen(false)} maxWidth="sm" fullWidth aria-labelledby="student-import-title">
+          <DialogTitle id="student-import-title">Import Students</DialogTitle>
+          <DialogContent>
+            {importError && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{importError}</Alert>}
+            <Typography sx={{ color: 'text.secondary', mb: 2 }}>
+              Upload a CSV, XLS, or XLSX file. Include each student’s name, email, initial password, roll/enrollment number, semester, and an existing department name or ID.
+            </Typography>
+            <Button onClick={downloadStudentTemplate} sx={{ mb: 2, px: 0 }}>
+              Download CSV template
+            </Button>
+            <Box>
+              <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} disabled={importing}>
+                Choose file
+                <input
+                  hidden
+                  type="file"
+                  accept=".csv,.xls,.xlsx"
+                  onChange={(event) => {
+                    setImportFile(event.target.files?.[0] || null);
+                    setImportError('');
+                  }}
+                />
+              </Button>
+              <Typography component="span" sx={{ ml: 1.5, color: 'text.secondary', overflowWrap: 'anywhere' }}>
+                {importFile?.name || 'No file selected'}
+              </Typography>
+            </Box>
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Duplicate emails or roll numbers are skipped. If a row is invalid, the entire import is rejected. Passwords are hashed before they are saved.
+            </Alert>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setImportDialogOpen(false)} color="inherit" variant="outlined" disabled={importing}>Cancel</Button>
+            <Button onClick={handleImport} variant="contained" disabled={importing || !importFile}
+              sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
+              {importing ? 'Importing...' : 'Import Students'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Add/Edit Dialog */}
         <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth aria-labelledby="student-dialog-title">

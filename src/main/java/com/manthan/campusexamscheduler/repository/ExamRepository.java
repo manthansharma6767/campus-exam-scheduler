@@ -28,6 +28,25 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
             FROM Exam e
             JOIN FETCH e.subject s
             JOIN FETCH s.department
+            WHERE (:query IS NULL
+                OR LOWER(s.subjectCode) LIKE CONCAT('%', LOWER(:query), '%')
+                OR LOWER(s.subjectName) LIKE CONCAT('%', LOWER(:query), '%')
+                OR LOWER(e.building) LIKE CONCAT('%', LOWER(:query), '%')
+                OR LOWER(e.roomNumber) LIKE CONCAT('%', LOWER(:query), '%'))
+                AND (:semester IS NULL OR s.semester = :semester)
+                AND (:examDate IS NULL OR e.examDate = :examDate)
+            ORDER BY e.examDate ASC, e.examTime ASC, s.subjectCode ASC
+            """)
+    List<Exam> searchPublicExams(
+            @Param("query") String query,
+            @Param("semester") Integer semester,
+            @Param("examDate") LocalDate examDate);
+
+    @Query("""
+            SELECT e
+            FROM Exam e
+            JOIN FETCH e.subject s
+            JOIN FETCH s.department
             WHERE e.examId = :id
             """)
     Optional<Exam> findByIdWithSubject(@Param("id") Long id);

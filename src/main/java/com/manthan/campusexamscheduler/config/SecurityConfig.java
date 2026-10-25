@@ -70,6 +70,8 @@ public class SecurityConfig {
                                 "/api/students/*/schedule"
                         ).permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/api/exams/search").permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/seating/plans", "/api/seating/plans/**").permitAll()
 
                         // Swagger / OpenAPI (development convenience)

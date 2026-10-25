@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +20,27 @@ public class ExamService {
 
     private final ExamRepository examRepository;
     private final SubjectRepository subjectRepository;
+
+    @Transactional(readOnly = true)
+    public List<ExamResponse> searchPublicExams(String query, Integer semester, LocalDate examDate) {
+        if (semester != null && (semester < 1 || semester > 8)) {
+            throw new IllegalArgumentException("Semester must be between 1 and 8.");
+        }
+        String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
+        return examRepository.searchPublicExams(normalizedQuery, semester, examDate)
+                .stream()
+                .map(exam -> ExamResponse.builder()
+                        .examId(exam.getExamId())
+                        .examDate(exam.getExamDate())
+                        .examTime(exam.getExamTime())
+                        .roomNumber(exam.getRoomNumber())
+                        .subjectId(exam.getSubject().getSubjectId())
+                        .subjectCode(exam.getSubject().getSubjectCode())
+                        .subjectName(exam.getSubject().getSubjectName())
+                        .building(exam.getBuilding())
+                        .build())
+                .toList();
+    }
 
     public ExamResponse createExam(ExamRequest request) {
 

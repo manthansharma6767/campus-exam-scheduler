@@ -47,8 +47,11 @@ export default function MySchedule() {
               <Box sx={{ textAlign: 'center', py: 8 }}>
                 <EventBusyIcon sx={{ fontSize: 64, color: '#B0B0B0', opacity: 0.35, mb: 2 }} />
                 <Typography variant="h5" sx={{ color: '#FFFFFF', mb: 1 }}>Your personal schedule is empty</Typography>
-                <Typography sx={{ color: '#B0B0B0', mb: 3 }}>Search your enrollment number and add the exams you want to keep here.</Typography>
-                <Button component={Link} to="/" variant="contained" startIcon={<ArrowBackIcon />}>Find my exams</Button>
+                <Typography sx={{ color: '#B0B0B0', mb: 3 }}>Search by enrollment number or browse exams, then add the ones you want to keep here.</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                  <Button component={Link} to="/" variant="outlined" startIcon={<ArrowBackIcon />}>Search by enrollment</Button>
+                  <Button component={Link} to="/exams" variant="contained" startIcon={<CalendarMonthIcon />}>Browse exams</Button>
+                </Box>
               </Box>
             ) : (
               <>

@@ -21,6 +21,7 @@ A full-stack application for managing college examination schedules. Administrat
 ### Student scheduling
 
 - Search for exams by enrollment number.
+- Browse published exams by course, venue, semester, or date without an enrollment number.
 - Add individual exams or the full result set to **My Schedule**.
 - Export a schedule as an iCalendar (`.ics`) file for calendar applications.
 
@@ -127,7 +128,7 @@ Rows with an existing or repeated email/roll number are skipped. If another row 
 
 ## Student schedules and calendar export
 
-Students search using their enrollment number. Selected exams are stored in the current browser and can be opened from **My Schedule**; selections do not sync between browsers or devices. The `.ics` export can be imported into Google Calendar, Outlook, Apple Calendar, and other calendar applications. Exported exam times use India Standard Time.
+Students can search by enrollment number or browse published exams by course, venue, semester, or date. Selected exams are stored in the current browser and can be opened from **My Schedule**; selections do not sync between browsers or devices. The `.ics` export can be imported into Google Calendar, Outlook, Apple Calendar, and other calendar applications. Exported exam times use India Standard Time.
 
 ## Development commands
 

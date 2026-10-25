@@ -158,14 +158,14 @@ export default function Navbar() {
           <ListItemButton
             onClick={() => {
               setDrawerOpen(false);
-              handleSearchClick();
+              navigate('/exams');
             }}
             sx={{ mx: 1, borderRadius: 2, mb: 0.5 }}
           >
             <ListItemIcon sx={{ minWidth: 40, color: '#B0B0B0' }}>
               <SearchIcon />
             </ListItemIcon>
-            <ListItemText primary="Search Exams" />
+            <ListItemText primary="Browse Exams" />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
@@ -322,14 +322,14 @@ export default function Navbar() {
                 </IconButton>
               </Tooltip>
 
-              <Tooltip title="Search" arrow>
+              <Tooltip title="Browse Exams" arrow>
                 <IconButton
-                  onClick={handleSearchClick}
+                  onClick={() => navigate('/exams')}
                   sx={{
                     color: 'rgba(255,255,255,0.6)',
                     '&:hover': { color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.08)' },
                   }}
-                  aria-label="Search"
+                  aria-label="Browse Exams"
                 >
                   <SearchIcon />
                 </IconButton>

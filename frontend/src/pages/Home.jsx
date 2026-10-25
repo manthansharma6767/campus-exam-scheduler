@@ -7,6 +7,7 @@ import Button from '@mui/material/Button';
 import Fade from '@mui/material/Fade';
 import SearchBox from '../components/SearchBox';
 import ChairIcon from '@mui/icons-material/Chair';
+import SearchIcon from '@mui/icons-material/Search';
 import handPencil from '../assets/hand-pencil.png';
 
 export default function Home() {
@@ -229,8 +230,7 @@ export default function Home() {
                     maxWidth: 600,
                   }}
                 >
-                  Find your exam schedule by entering your enrollment number (e.g. RBU2024001). 
-                  Feel free to search to find your personalized exam schedule!
+                  Find your personalized schedule using your enrollment number, or browse all published exams by subject, semester, date, or venue.
                 </Typography>
 
                 <Typography
@@ -249,9 +249,14 @@ export default function Home() {
                 <Box sx={{ mb: 4 }}>
                   <SearchBox />
                 </Box>
-                <Button component={Link} to="/seating" variant="outlined" startIcon={<ChairIcon />} sx={{ borderColor: 'rgba(255,143,0,0.5)', color: '#FFB300' }}>
-                  Find my seat by roll number
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  <Button component={Link} to="/exams" variant="outlined" startIcon={<SearchIcon />} sx={{ borderColor: 'rgba(255,143,0,0.5)', color: '#FFB300' }}>
+                    Browse all exams
+                  </Button>
+                  <Button component={Link} to="/seating" variant="outlined" startIcon={<ChairIcon />} sx={{ borderColor: 'rgba(255,143,0,0.5)', color: '#FFB300' }}>
+                    Find my seat by roll number
+                  </Button>
+                </Box>
               </Box>
             </Fade>
           </Container>
@@ -287,7 +292,7 @@ export default function Home() {
                 {
                   icon: '🔍',
                   title: 'Quick Search',
-                  description: 'Find your exam schedule in seconds using your enrollment number.',
+                  description: 'Search by enrollment number or browse exams by course, semester, date, and venue.',
                 },
                 {
                   icon: '📋',

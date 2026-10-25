@@ -11,6 +11,7 @@ import Loading from './components/Loading';
 
 const Home = lazy(() => import('./pages/Home'));
 const SearchResult = lazy(() => import('./pages/SearchResult'));
+const BrowseExams = lazy(() => import('./pages/BrowseExams'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Departments = lazy(() => import('./pages/Departments'));
@@ -43,6 +44,7 @@ export default function App() {
                 {/* Public Routes */}
                 <Route path="/" element={<Home />} />
                 <Route path="/search/:enrollmentNumber" element={<SearchResult />} />
+                <Route path="/exams" element={<BrowseExams />} />
                 <Route path="/calendar" element={<MySchedule />} />
                 <Route path="/seating" element={<SeatingLookup />} />
 

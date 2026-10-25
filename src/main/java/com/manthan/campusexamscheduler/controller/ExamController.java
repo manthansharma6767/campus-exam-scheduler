@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/exams")
@@ -17,6 +18,14 @@ import java.util.List;
 public class ExamController {
 
     private final ExamService examService;
+
+    @GetMapping("/search")
+    public ResponseEntity<List<ExamResponse>> searchPublicExams(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Integer semester,
+            @RequestParam(required = false) LocalDate date) {
+        return ResponseEntity.ok(examService.searchPublicExams(query, semester, date));
+    }
 
     @PostMapping
     public ResponseEntity<ExamResponse> createExam(

@@ -39,12 +39,11 @@ A full-stack application for managing college examination schedules. Administrat
 
 ```text
 .
-├── src/                 # Spring Boot backend and tests
+├── backend/             # Spring Boot application, tests, and Maven wrapper
 ├── frontend/            # React/Vite web application
 ├── postman/             # Postman workspace configuration
-├── Dockerfile
-├── mvnw, mvnw.cmd       # Maven wrapper scripts
-└── pom.xml
+├── Dockerfile           # Builds the backend image
+└── README.md
 ```
 
 ## Getting started
@@ -79,6 +78,7 @@ $env:SPRING_DATASOURCE_PASSWORD = "<your-local-mysql-password>"
 $env:JWT_SECRET = "<a-random-secret-at-least-32-characters-long>"
 $env:ADMIN_SETUP_TOKEN = "<a-long-random-one-time-setup-token>"
 $env:CORS_ALLOWED_ORIGINS = "http://localhost:5173"
+Set-Location backend
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -118,13 +118,13 @@ For row-based files, use one exam per row with these columns:
 
 Subject codes must already exist in Subject Management. Excel imports read the first worksheet; a title above the header is allowed. PDFs must contain selectable text and can use aligned exam rows or date-by-course matrices. Missing venues are saved as **Not assigned**.
 
-The import is validated as a single transaction. If a row is invalid or references an unknown subject, the import is rejected and no rows are saved. Existing exams with the same subject, date, and time are skipped to prevent duplicates when a timetable is uploaded again.
+The admin can preview parsed rows before confirming an import. The preview reports row-level validation errors, duplicate rows, and same-slot room or student-cohort conflicts. An import with validation errors or conflicts is rejected without saving any rows. Existing exams with the same subject, date, and time are skipped to prevent duplicates when a timetable is uploaded again.
 
 ## Importing students
 
 In **Student Management**, choose **Import Students** and upload a CSV, XLS, or XLSX file. Excel imports read the first worksheet. The header row must include `Name`, `Email`, `Password`, `Roll Number` (or `Enrollment Number`), `Semester`, and `Department` (department name or ID). A CSV template is available in the import dialog. Department names must match an existing department. Passwords are hashed before they are stored.
 
-Rows with an existing or repeated email/roll number are skipped. If another row is invalid, the import is rejected as a whole and no students are saved. Supported semester values are 1 through 8.
+The admin can preview parsed student records before confirming an import. Passwords are never shown in the preview. Rows with an existing or repeated email/roll number are skipped; if any other row is invalid, the import is rejected as a whole and no students are saved. Supported semester values are 1 through 8.
 
 ## Student schedules and calendar export
 
@@ -132,9 +132,10 @@ Students can search by enrollment number or browse published exams by course, ve
 
 ## Development commands
 
-Run backend tests from the repository root:
+Run backend tests from `backend/`:
 
 ```powershell
+Set-Location backend
 .\mvnw.cmd test
 ```
 

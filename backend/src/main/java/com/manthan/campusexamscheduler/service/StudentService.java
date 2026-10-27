@@ -182,6 +182,7 @@ public class StudentService {
                         .subjectName(exam.getSubject().getSubjectName())
                         .examDate(exam.getExamDate())
                         .examTime(exam.getExamTime())
+                        .examEndTime(exam.getExamEndTime())
                         .building(exam.getBuilding())
                         .roomNumber(exam.getRoomNumber())
                         .build())

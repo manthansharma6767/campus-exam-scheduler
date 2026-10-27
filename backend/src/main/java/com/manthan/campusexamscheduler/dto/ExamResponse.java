@@ -18,6 +18,8 @@ public class ExamResponse {
 
     private LocalTime examTime;
 
+    private LocalTime examEndTime;
+
     private String roomNumber;
 
     private Long subjectId;

@@ -118,7 +118,7 @@ For row-based files, use one exam per row with these columns:
 
 Subject codes must already exist in Subject Management. Excel imports read the first worksheet; a title above the header is allowed. PDFs must contain selectable text and can use aligned exam rows or date-by-course matrices. Missing venues are saved as **Not assigned**.
 
-The admin can preview parsed rows before confirming an import. The preview reports row-level validation errors, duplicate rows, and same-slot room or student-cohort conflicts. An import with validation errors or conflicts is rejected without saving any rows. Existing exams with the same subject, date, and time are skipped to prevent duplicates when a timetable is uploaded again.
+The admin can preview parsed rows before confirming an import. Timetable rows may provide a single `Time` value, a time range such as `09:00–12:00`, or separate `Start Time` and `End Time` columns. The preview reports row-level validation errors, duplicate rows, and overlapping room or student-cohort conflicts. An import with validation errors or conflicts is rejected without saving any rows. Existing exams with the same subject, date, and start time are skipped to prevent duplicates when a timetable is uploaded again. End times are optional for older records and for timetables that only provide a start time; when a duration is unknown, the scheduler checks only matching start times rather than guessing an exam length.
 
 ## Importing students
 

@@ -20,6 +20,8 @@ public class StudentScheduleResponse {
 
     private LocalTime examTime;
 
+    private LocalTime examEndTime;
+
     private String building;
 
     private String roomNumber;

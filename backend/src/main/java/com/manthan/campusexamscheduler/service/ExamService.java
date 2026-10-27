@@ -35,6 +35,7 @@ public class ExamService {
                         .examId(exam.getExamId())
                         .examDate(exam.getExamDate())
                         .examTime(exam.getExamTime())
+                        .examEndTime(exam.getExamEndTime())
                         .roomNumber(exam.getRoomNumber())
                         .subjectId(exam.getSubject().getSubjectId())
                         .subjectCode(exam.getSubject().getSubjectCode())
@@ -46,6 +47,7 @@ public class ExamService {
 
     @Transactional
     public ExamResponse createExam(ExamRequest request) {
+        validateExamTimes(request);
 
         // Check if subject exists
         Subject subject = subjectRepository
@@ -61,6 +63,7 @@ public class ExamService {
         Exam exam = Exam.builder()
                 .examDate(request.getExamDate())
                 .examTime(request.getExamTime())
+                .examEndTime(request.getExamEndTime())
                 .roomNumber(request.getRoomNumber())
                 .building(request.getBuilding())
                 .subject(subject)
@@ -76,6 +79,7 @@ public class ExamService {
                 .examId(savedExam.getExamId())
                 .examDate(savedExam.getExamDate())
                 .examTime(savedExam.getExamTime())
+                .examEndTime(savedExam.getExamEndTime())
                 .roomNumber(savedExam.getRoomNumber())
                 .subjectId(savedExam.getSubject().getSubjectId())
                 .subjectCode(savedExam.getSubject().getSubjectCode())
@@ -94,6 +98,7 @@ public class ExamService {
                         .examId(exam.getExamId())
                         .examDate(exam.getExamDate())
                         .examTime(exam.getExamTime())
+                        .examEndTime(exam.getExamEndTime())
                         .roomNumber(exam.getRoomNumber())
                         .subjectId(exam.getSubject().getSubjectId())
                         .subjectCode(exam.getSubject().getSubjectCode())
@@ -114,6 +119,7 @@ public class ExamService {
                 .subjectName(exam.getSubject().getSubjectName())
                 .examId(exam.getExamId())
                 .examTime(exam.getExamTime())
+                .examEndTime(exam.getExamEndTime())
                 .examDate(exam.getExamDate())
                 .roomNumber(exam.getRoomNumber())
                 .subjectCode(exam.getSubject().getSubjectCode())
@@ -125,6 +131,7 @@ public class ExamService {
     // UPDATE
     @Transactional
     public ExamResponse updateExam(Long id, ExamRequest request) {
+        validateExamTimes(request);
 
         Exam exam = examRepository.findByIdWithSubject(id)
                 .orElseThrow(() ->
@@ -143,6 +150,7 @@ public class ExamService {
                 .examId(id)
                 .examDate(request.getExamDate())
                 .examTime(request.getExamTime())
+                .examEndTime(request.getExamEndTime())
                 .roomNumber(request.getRoomNumber())
                 .building(request.getBuilding())
                 .subject(subject)
@@ -151,6 +159,7 @@ public class ExamService {
 
         exam.setExamDate(request.getExamDate());
         exam.setExamTime(request.getExamTime());
+        exam.setExamEndTime(request.getExamEndTime());
         exam.setRoomNumber(request.getRoomNumber());
         exam.setBuilding(request.getBuilding());
         exam.setSubject(subject);
@@ -161,6 +170,7 @@ public class ExamService {
                 .examId(updatedExam.getExamId())
                 .examDate(updatedExam.getExamDate())
                 .examTime(updatedExam.getExamTime())
+                .examEndTime(updatedExam.getExamEndTime())
                 .roomNumber(updatedExam.getRoomNumber())
                 .subjectId(updatedExam.getSubject().getSubjectId())
                 .subjectCode(updatedExam.getSubject().getSubjectCode())
@@ -178,6 +188,13 @@ public class ExamService {
                     .distinct()
                     .reduce((left, right) -> left + " " + right)
                     .orElse("The exam conflicts with the current schedule."));
+        }
+    }
+
+    private void validateExamTimes(ExamRequest request) {
+        if (request.getExamTime() != null && request.getExamEndTime() != null
+                && !request.getExamEndTime().isAfter(request.getExamTime())) {
+            throw new IllegalArgumentException("Exam end time must be later than its start time.");
         }
     }
 

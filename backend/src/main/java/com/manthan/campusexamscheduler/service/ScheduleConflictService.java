@@ -23,7 +23,7 @@ public class ScheduleConflictService {
             if (scheduled == null
                     || (ignoredExamId != null && Objects.equals(ignoredExamId, scheduled.getExamId()))
                     || !Objects.equals(candidate.getExamDate(), scheduled.getExamDate())
-                    || !Objects.equals(candidate.getExamTime(), scheduled.getExamTime())) {
+                    || !overlaps(candidate, scheduled)) {
                 continue;
             }
 
@@ -52,6 +52,19 @@ public class ScheduleConflictService {
             }
         }
         return conflicts;
+    }
+
+    private boolean overlaps(Exam left, Exam right) {
+        if (left.getExamTime() == null || right.getExamTime() == null) return false;
+
+        // Old records and sources with a single time have no known duration. Preserve the
+        // original same-start protection without guessing how long those exams last.
+        if (left.getExamEndTime() == null || right.getExamEndTime() == null) {
+            return left.getExamTime().equals(right.getExamTime());
+        }
+
+        return left.getExamTime().isBefore(right.getExamEndTime())
+                && right.getExamTime().isBefore(left.getExamEndTime());
     }
 
     private boolean sameAssignedRoom(Exam left, Exam right) {

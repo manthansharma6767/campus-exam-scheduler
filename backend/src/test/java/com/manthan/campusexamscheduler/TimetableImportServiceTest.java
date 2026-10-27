@@ -98,6 +98,43 @@ class TimetableImportServiceTest {
     }
 
     @Test
+    void importsNumericExcelStartAndEndTimeColumns() throws Exception {
+        Subject subject = Subject.builder().subjectId(7L).subjectCode("CS101").build();
+        List<Exam> savedExams = new ArrayList<>();
+        TimetableImportService timetableImportService = serviceFor(subject, savedExams);
+
+        byte[] workbookBytes;
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("Exams");
+            String[] headers = { "Subject Code", "Date", "Start Time", "End Time", "Building", "Room" };
+            var header = sheet.createRow(0);
+            for (int index = 0; index < headers.length; index++) header.createCell(index).setCellValue(headers[index]);
+
+            var row = sheet.createRow(1);
+            row.createCell(0).setCellValue("CS101");
+            row.createCell(1).setCellValue("2026-11-12");
+            row.createCell(2).setCellValue(0.375);
+            row.createCell(3).setCellValue(0.5);
+            row.createCell(4).setCellValue("Main Building");
+            row.createCell(5).setCellValue("A-205");
+            DataFormat format = workbook.createDataFormat();
+            CellStyle timeStyle = workbook.createCellStyle();
+            timeStyle.setDataFormat(format.getFormat("hh:mm"));
+            row.getCell(2).setCellStyle(timeStyle);
+            row.getCell(3).setCellStyle(timeStyle);
+            workbook.write(output);
+            workbookBytes = output.toByteArray();
+        }
+
+        var response = timetableImportService.importTimetable(new MockMultipartFile(
+                "file", "exam-times.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", workbookBytes));
+
+        assertEquals(1, response.getImported());
+        assertEquals(LocalTime.of(9, 0), savedExams.get(0).getExamTime());
+        assertEquals(LocalTime.of(12, 0), savedExams.get(0).getExamEndTime());
+    }
+
+    @Test
     void importsTextPdfWithAlignedWhitespaceColumnsAndTitle() throws Exception {
         Subject subject = Subject.builder()
                 .subjectId(7L)
@@ -203,6 +240,7 @@ class TimetableImportServiceTest {
         assertEquals(1, response.getImported());
         assertEquals(LocalDate.of(2026, 11, 12), savedExams.get(0).getExamDate());
         assertEquals(LocalTime.of(9, 0), savedExams.get(0).getExamTime());
+        assertEquals(LocalTime.of(12, 0), savedExams.get(0).getExamEndTime());
         assertEquals("Main Building", savedExams.get(0).getBuilding());
         assertEquals("A-205", savedExams.get(0).getRoomNumber());
     }

@@ -29,6 +29,9 @@ public class Exam {
     @Column(nullable = false)
     private LocalTime examTime;
 
+    @Column(name = "exam_end_time")
+    private LocalTime examEndTime;
+
     @NotBlank
     @Size(max = 20)
     @Column(nullable = false, length = 20)

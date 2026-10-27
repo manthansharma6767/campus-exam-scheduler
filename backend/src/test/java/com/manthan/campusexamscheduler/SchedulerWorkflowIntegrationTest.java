@@ -163,8 +163,8 @@ class SchedulerWorkflowIntegrationTest {
         MockMultipartFile timetable = new MockMultipartFile("file", "conflicts.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 spreadsheetBytes(new String[][] {
-                        {"CF101", "2098-12-31", "09:00", "Conflict Hall", "101"},
-                        {"CF102", "2098-12-31", "09:00", "Conflict Hall", "101"},
+                        {"CF101", "2098-12-31", "09:00-11:00", "Conflict Hall", "101"},
+                        {"CF102", "2098-12-31", "10:30-12:00", "Conflict Hall", "101"},
                         {"UNKNOWN", "not-a-date", "09:00", "Other Hall", "202"}
                 }));
 
@@ -173,6 +173,7 @@ class SchedulerWorkflowIntegrationTest {
         assertEquals(2, preview.validRows());
         assertEquals(1, preview.errors().size());
         assertEquals(2, preview.conflicts().size());
+        assertEquals("09:00–11:00", preview.rows().get(0).values().get("Time"));
         assertFalse(preview.canImport());
         assertEquals(examsBefore, examService.getAllExams().size());
         mockMvc.perform(multipart("/api/exams/import/preview").file(timetable).with(user("test-admin")))
@@ -192,12 +193,21 @@ class SchedulerWorkflowIntegrationTest {
         examService.createExam(firstExam);
         ExamRequest cohortConflict = ExamRequest.builder()
                 .examDate(LocalDate.of(2098, 12, 30))
-                .examTime(LocalTime.of(9, 0))
+                .examTime(LocalTime.of(10, 30))
+                .examEndTime(LocalTime.of(12, 0))
                 .building("Another Hall")
                 .roomNumber("202")
                 .subjectId(secondSubject.getSubjectId())
                 .build();
         assertThrows(ScheduleConflictException.class, () -> examService.createExam(cohortConflict));
+        assertThrows(IllegalArgumentException.class, () -> examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2098, 12, 30))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(9, 0))
+                .roomNumber("303")
+                .building("Other Hall")
+                .subjectId(firstSubject.getSubjectId())
+                .build()));
     }
 
     @Test
@@ -356,6 +366,7 @@ class SchedulerWorkflowIntegrationTest {
         return ExamRequest.builder()
                 .examDate(date)
                 .examTime(time)
+                .examEndTime(time.plusHours(2))
                 .roomNumber("A-205")
                 .subjectId(subjectId)
                 .building("Main Building")

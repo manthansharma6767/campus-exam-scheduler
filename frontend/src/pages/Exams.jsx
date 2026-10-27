@@ -33,7 +33,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ImportPreviewPanel from '../components/ImportPreviewPanel';
 import api from '../services/api';
 
-const emptyForm = { examDate: '', examTime: '', roomNumber: '', subjectId: '', building: '' };
+const emptyForm = { examDate: '', examTime: '', examEndTime: '', roomNumber: '', subjectId: '', building: '' };
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -104,6 +104,7 @@ export default function Exams() {
     setForm({
       examDate: exam.examDate || '',
       examTime: exam.examTime ? exam.examTime.substring(0, 5) : '',
+      examEndTime: exam.examEndTime ? exam.examEndTime.substring(0, 5) : '',
       roomNumber: exam.roomNumber,
       subjectId: exam.subjectId,
       building: exam.building,
@@ -115,6 +116,7 @@ export default function Exams() {
   const validate = () => {
     if (!form.examDate) return 'Exam date is required';
     if (!form.examTime) return 'Exam time is required';
+    if (form.examEndTime && form.examEndTime <= form.examTime) return 'Exam end time must be later than its start time';
     if (!form.roomNumber.trim()) return 'Room number is required';
     if (!form.subjectId) return 'Subject is required';
     if (!form.building.trim()) return 'Building is required';
@@ -129,6 +131,7 @@ export default function Exams() {
       const payload = {
         examDate: form.examDate,
         examTime: form.examTime + ':00',
+        examEndTime: form.examEndTime ? `${form.examEndTime}:00` : null,
         roomNumber: form.roomNumber.trim(),
         subjectId: parseInt(form.subjectId, 10),
         building: form.building.trim(),
@@ -288,7 +291,7 @@ export default function Exams() {
                           </Box>
                         </TableCell>
                         <TableCell>{formatDate(exam.examDate)}</TableCell>
-                        <TableCell>{formatTime(exam.examTime)}</TableCell>
+                        <TableCell>{formatTime(exam.examTime)}{exam.examEndTime ? ` – ${formatTime(exam.examEndTime)}` : ''}</TableCell>
                         <TableCell>{exam.building}</TableCell>
                         <TableCell>{exam.roomNumber}</TableCell>
                         <TableCell align="right">
@@ -360,6 +363,9 @@ export default function Exams() {
                 slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Exam date' } }} fullWidth />
               <TextField name="examTime" label="Exam Time" type="time" value={form.examTime} onChange={handleChange}
                 slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Exam time' } }} fullWidth />
+              <TextField name="examEndTime" label="Exam End Time (optional)" type="time" value={form.examEndTime} onChange={handleChange}
+                helperText="Add an end time to detect exams that overlap even when they start at different times."
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Exam end time' } }} fullWidth />
               <TextField name="building" label="Building" value={form.building} onChange={handleChange}
                 placeholder="e.g. Main Building" slotProps={{ htmlInput: { 'aria-label': 'Building name', maxLength: 100 } }} fullWidth />
               <TextField name="roomNumber" label="Room Number" value={form.roomNumber} onChange={handleChange}

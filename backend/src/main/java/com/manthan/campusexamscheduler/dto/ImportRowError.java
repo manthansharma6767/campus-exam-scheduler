@@ -5,8 +5,7 @@ import lombok.Value;
 
 @Value
 @Builder
-public class StudentImportResponse {
-    int imported;
-    int skippedDuplicates;
+public class ImportRowError {
+    int row;
     String message;
 }

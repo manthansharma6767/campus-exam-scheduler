@@ -14,7 +14,7 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    @Value("${JWT_SECRET:mysecretkeymysecretkeymysecretkeymysecretkey123456}")
+    @Value("${JWT_SECRET}")
     private String secretKey;
 
     // Token valid for 24 hours

@@ -10,6 +10,7 @@ import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.service.AuthenticationService;
 import com.manthan.campusexamscheduler.service.DepartmentService;
 import com.manthan.campusexamscheduler.service.ExamService;
+import com.manthan.campusexamscheduler.service.StudentImportService;
 import com.manthan.campusexamscheduler.service.StudentService;
 import com.manthan.campusexamscheduler.service.SubjectService;
 import com.manthan.campusexamscheduler.service.SeatingPlanService;
@@ -35,6 +36,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.test.annotation.DirtiesContext;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -44,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -75,6 +78,9 @@ class SchedulerWorkflowIntegrationTest {
 
     @Autowired
     private StudentService studentService;
+
+    @Autowired
+    private StudentImportService studentImportService;
 
     @Autowired
     private ExamService examService;
@@ -157,6 +163,14 @@ class SchedulerWorkflowIntegrationTest {
                 .build());
         assertEquals("Updated Hall", updatedExam.getBuilding());
         assertEquals(1, studentService.getStudentSchedule("RB2101").size());
+        mockMvc.perform(get("/api/exams/search")
+                        .param("query", "CS101")
+                        .param("semester", "5")
+                        .param("date", "2026-11-12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].subjectCode").value("CS101"));
+        mockMvc.perform(get("/api/departments"))
+                .andExpect(status().isUnauthorized());
         assertThrows(DuplicateResourceException.class, () -> examService.createExam(firstExam));
 
         MockMultipartFile timetable = new MockMultipartFile(
@@ -245,6 +259,82 @@ class SchedulerWorkflowIntegrationTest {
         assertTrue(replaced.isReplacedExistingPlan());
         assertEquals(imported.getPlan().getSeatingPlanId(), replaced.getPlan().getSeatingPlanId());
         assertEquals(4, replaced.getPlan().getSeatCount());
+    }
+
+    @Test
+    void importsStudentCsvSkipsDuplicatesAndRejectsInvalidRowsAtomically() throws Exception {
+        String departmentName = "Student Import Test Department";
+        departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName(departmentName).build());
+        String header = "Name,Email,Password,Roll Number,Semester,Department\r\n";
+        String validRow = "\"Doe, Jane\",bulk.one@example.com,ImportPass123,RB-IMPORT-001,4,"
+                + departmentName + "\r\n";
+        MockMultipartFile studentFile = new MockMultipartFile(
+                "file", "students.csv", "text/csv",
+                (header + validRow).getBytes(StandardCharsets.UTF_8));
+
+        var firstImport = studentImportService.importStudents(studentFile);
+        assertEquals(1, firstImport.getImported());
+        assertEquals(0, firstImport.getSkippedDuplicates());
+        assertTrue(studentService.getAllStudents().stream()
+                .anyMatch(student -> "RB-IMPORT-001".equals(student.getEnrollmentNumber())
+                        && "Doe, Jane".equals(student.getName())));
+
+        var repeatedImport = studentImportService.importStudents(studentFile);
+        assertEquals(0, repeatedImport.getImported());
+        assertEquals(1, repeatedImport.getSkippedDuplicates());
+
+        String invalidRows = header
+                + "Not Saved,not-saved@example.com,ImportPass123,RB-IMPORT-002,4,"
+                + departmentName + "\r\n"
+                + "Invalid Semester,invalid-semester@example.com,ImportPass123,RB-IMPORT-003,9,"
+                + departmentName + "\r\n";
+        MockMultipartFile invalidFile = new MockMultipartFile(
+                "file", "invalid-students.csv", "text/csv",
+                invalidRows.getBytes(StandardCharsets.UTF_8));
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> studentImportService.importStudents(invalidFile));
+        assertTrue(error.getMessage().contains("Row 3"));
+        assertTrue(error.getMessage().contains("semester"));
+        assertTrue(studentService.getAllStudents().stream()
+                .noneMatch(student -> "RB-IMPORT-002".equals(student.getEnrollmentNumber())));
+    }
+
+    @Test
+    void deletesDepartmentSubjectStudentAndExamRecords() throws Exception {
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName("Delete Workflow Test Department").build());
+        var subject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode("DEL101")
+                .subjectName("Deletion Test")
+                .semester(2)
+                .departmentId(department.getDepartmentId())
+                .build());
+        var student = studentService.registerStudent(StudentRequest.builder()
+                .name("Delete Workflow Student")
+                .email("delete.workflow@example.com")
+                .password("TestOnlyPass123")
+                .enrollmentNumber("RB-DELETE-001")
+                .semester(2)
+                .departmentId(department.getDepartmentId())
+                .build());
+        var exam = examService.createExam(examRequest(
+                subject.getSubjectId(), LocalDate.of(2027, 5, 11), LocalTime.of(10, 0)));
+
+        examService.deleteExamById(exam.getExamId());
+        studentService.deleteStudent(student.getStudentId());
+        subjectService.deleteSubject(subject.getSubjectId());
+        departmentService.deleteDepartment(department.getDepartmentId());
+
+        assertTrue(examService.getAllExams().stream()
+                .noneMatch(savedExam -> savedExam.getExamId().equals(exam.getExamId())));
+        assertTrue(studentService.getAllStudents().stream()
+                .noneMatch(savedStudent -> savedStudent.getStudentId().equals(student.getStudentId())));
+        assertTrue(subjectService.getAllSubjects().stream()
+                .noneMatch(savedSubject -> savedSubject.getSubjectId().equals(subject.getSubjectId())));
+        assertTrue(departmentService.getAllDepartments().stream()
+                .noneMatch(savedDepartment -> savedDepartment.getDepartmentId().equals(department.getDepartmentId())));
     }
 
     private ExamRequest examRequest(Long subjectId, LocalDate date, LocalTime time) {

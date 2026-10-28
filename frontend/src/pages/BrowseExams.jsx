@@ -99,7 +99,7 @@ export default function BrowseExams() {
             <Button component={Link} to="/" startIcon={<ArrowBackIcon />} sx={{ color: 'rgba(255,255,255,0.7)', mb: 2 }}>
               Back to Home
             </Button>
-            <Stack direction="row" spacing={1.5} alignItems="center">
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
               <SearchIcon sx={{ color: '#FF8F00', fontSize: 32 }} />
               <Typography variant="h3" sx={{ fontWeight: 800, fontSize: { xs: '1.5rem', md: '2.2rem' } }}>
                 Browse Exam Schedules
@@ -114,7 +114,7 @@ export default function BrowseExams() {
         <Box sx={{ background: '#1A1A1A', minHeight: '55vh' }}>
           <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
             <Paper component="form" onSubmit={handleSearch} elevation={0} sx={{ p: { xs: 2, md: 3 }, mb: 3, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 3, backgroundColor: '#242424' }}>
-              <Grid container spacing={2} alignItems="center">
+              <Grid container spacing={2} sx={{ alignItems: 'center' }}>
                 <Grid size={{ xs: 12, md: 6 }}>
                   <TextField
                     name="query"
@@ -137,7 +137,7 @@ export default function BrowseExams() {
                   <TextField name="date" label="Exam date" type="date" value={filters.date} onChange={handleFilterChange} fullWidth slotProps={{ inputLabel: { shrink: true } }} />
                 </Grid>
                 <Grid size={12}>
-                  <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+                  <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'flex-end' }}>
                     <Button type="button" variant="outlined" onClick={clearFilters}>Clear filters</Button>
                     <Button type="submit" variant="contained" startIcon={<SearchIcon />}>Search Exams</Button>
                   </Stack>

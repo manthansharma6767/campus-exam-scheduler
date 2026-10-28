@@ -72,7 +72,10 @@ export function downloadCalendar(exams, durationMinutes = 180) {
   const events = exams.flatMap((exam) => {
     if (!exam.examDate || !exam.examTime) return [];
     const start = eventStartDate(exam.examDate, exam.examTime);
-    const end = new Date(start.getTime() + durationMinutes * 60_000);
+    const statedEnd = exam.examEndTime ? eventStartDate(exam.examDate, exam.examEndTime) : null;
+    const end = statedEnd && statedEnd > start
+      ? statedEnd
+      : new Date(start.getTime() + durationMinutes * 60_000);
     const format = (date) => date.toISOString().replaceAll('-', '').replaceAll(':', '').replace(/\.\d{3}Z$/, 'Z');
     const uid = `${getExamKey(exam, exam.enrollmentNumber).replace(/[^A-Z0-9|]/g, '-')}.campusexamscheduler`;
     return [

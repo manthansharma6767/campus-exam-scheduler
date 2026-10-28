@@ -5,6 +5,7 @@ import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.repository.ExamRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
 import com.manthan.campusexamscheduler.service.TimetableImportService;
+import com.manthan.campusexamscheduler.service.ScheduleConflictService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -94,6 +95,43 @@ class TimetableImportServiceTest {
         assertEquals(LocalTime.of(9, 0), savedExams.get(0).getExamTime());
         assertEquals("Main Building", savedExams.get(0).getBuilding());
         assertEquals("A-205", savedExams.get(0).getRoomNumber());
+    }
+
+    @Test
+    void importsNumericExcelStartAndEndTimeColumns() throws Exception {
+        Subject subject = Subject.builder().subjectId(7L).subjectCode("CS101").build();
+        List<Exam> savedExams = new ArrayList<>();
+        TimetableImportService timetableImportService = serviceFor(subject, savedExams);
+
+        byte[] workbookBytes;
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("Exams");
+            String[] headers = { "Subject Code", "Date", "Start Time", "End Time", "Building", "Room" };
+            var header = sheet.createRow(0);
+            for (int index = 0; index < headers.length; index++) header.createCell(index).setCellValue(headers[index]);
+
+            var row = sheet.createRow(1);
+            row.createCell(0).setCellValue("CS101");
+            row.createCell(1).setCellValue("2026-11-12");
+            row.createCell(2).setCellValue(0.375);
+            row.createCell(3).setCellValue(0.5);
+            row.createCell(4).setCellValue("Main Building");
+            row.createCell(5).setCellValue("A-205");
+            DataFormat format = workbook.createDataFormat();
+            CellStyle timeStyle = workbook.createCellStyle();
+            timeStyle.setDataFormat(format.getFormat("hh:mm"));
+            row.getCell(2).setCellStyle(timeStyle);
+            row.getCell(3).setCellStyle(timeStyle);
+            workbook.write(output);
+            workbookBytes = output.toByteArray();
+        }
+
+        var response = timetableImportService.importTimetable(new MockMultipartFile(
+                "file", "exam-times.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", workbookBytes));
+
+        assertEquals(1, response.getImported());
+        assertEquals(LocalTime.of(9, 0), savedExams.get(0).getExamTime());
+        assertEquals(LocalTime.of(12, 0), savedExams.get(0).getExamEndTime());
     }
 
     @Test
@@ -202,6 +240,7 @@ class TimetableImportServiceTest {
         assertEquals(1, response.getImported());
         assertEquals(LocalDate.of(2026, 11, 12), savedExams.get(0).getExamDate());
         assertEquals(LocalTime.of(9, 0), savedExams.get(0).getExamTime());
+        assertEquals(LocalTime.of(12, 0), savedExams.get(0).getExamEndTime());
         assertEquals("Main Building", savedExams.get(0).getBuilding());
         assertEquals("A-205", savedExams.get(0).getRoomNumber());
     }
@@ -219,13 +258,15 @@ class TimetableImportServiceTest {
         });
         ExamRepository examRepository = proxy(ExamRepository.class, (method, args) -> {
             if (method.equals("existsBySubject_SubjectIdAndExamDateAndExamTime")) return false;
+            if (method.equals("findAllWithSubject")) return new ArrayList<>(savedExams);
             if (method.equals("saveAll")) {
                 for (Object exam : (Iterable<?>) args[0]) savedExams.add((Exam) exam);
                 return savedExams;
             }
             throw new UnsupportedOperationException(method);
         });
-        TimetableImportService timetableImportService = new TimetableImportService(examRepository, subjectRepository);
+        TimetableImportService timetableImportService = new TimetableImportService(
+                examRepository, subjectRepository, new ScheduleConflictService());
 
         byte[] pdfBytes;
         String[] dates = { "18-Nov-26", "20-Nov-26", "23-Nov-26", "25-Nov-26", "27-Nov-26", "30-Nov-26", "02-Dec-26" };
@@ -320,13 +361,14 @@ class TimetableImportServiceTest {
         });
         ExamRepository examRepository = proxy(ExamRepository.class, (method, args) -> {
             if (method.equals("existsBySubject_SubjectIdAndExamDateAndExamTime")) return false;
+            if (method.equals("findAllWithSubject")) return new ArrayList<>(savedExams);
             if (method.equals("saveAll")) {
                 for (Object exam : (Iterable<?>) args[0]) savedExams.add((Exam) exam);
                 return savedExams;
             }
             throw new UnsupportedOperationException(method);
         });
-        return new TimetableImportService(examRepository, subjectRepository);
+        return new TimetableImportService(examRepository, subjectRepository, new ScheduleConflictService());
     }
 
     private static <T> T proxy(Class<T> type, RepositoryCall call) {

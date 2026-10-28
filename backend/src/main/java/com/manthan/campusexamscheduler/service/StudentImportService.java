@@ -1,8 +1,12 @@
 package com.manthan.campusexamscheduler.service;
 
 import com.manthan.campusexamscheduler.dto.StudentImportResponse;
+import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
+import com.manthan.campusexamscheduler.dto.ImportPreviewRow;
+import com.manthan.campusexamscheduler.dto.ImportRowError;
 import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Student;
+import com.manthan.campusexamscheduler.exception.ImportValidationException;
 import com.manthan.campusexamscheduler.repository.DepartmentRepository;
 import com.manthan.campusexamscheduler.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,13 +29,47 @@ public class StudentImportService {
     private static final Set<String> REQUIRED_HEADERS = Set.of(
             "name", "email", "password", "enrollmentNumber", "semester");
     private static final int HEADER_SCAN_LIMIT = 20;
+    private static final int MAX_PREVIEW_ROWS = 200;
+    private static final String CSV_PARSE_ERROR_MARKER = "__CSV_PARSE_ERROR__";
 
     private final StudentRepository studentRepository;
     private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Transactional(readOnly = true)
+    public ImportPreviewResponse previewStudents(MultipartFile file) {
+        return toPreview(analyzeStudents(file));
+    }
+
     @Transactional
     public StudentImportResponse importStudents(MultipartFile file) {
+        StudentAnalysis analysis = analyzeStudents(file);
+        ImportPreviewResponse preview = toPreview(analysis);
+        if (!preview.canImport()) {
+            throw new ImportValidationException(preview);
+        }
+
+        List<Student> students = analysis.candidates().stream()
+                .map(candidate -> Student.builder()
+                        .name(candidate.name())
+                        .email(candidate.email())
+                        .password(passwordEncoder.encode(candidate.password()))
+                        .enrollmentNumber(candidate.enrollmentNumber())
+                        .semester(candidate.semester())
+                        .department(candidate.department())
+                        .build())
+                .toList();
+        studentRepository.saveAll(students);
+        String message = "Imported " + students.size() + " student(s); skipped "
+                + analysis.skippedDuplicates() + " duplicate(s).";
+        return StudentImportResponse.builder()
+                .imported(students.size())
+                .skippedDuplicates(analysis.skippedDuplicates())
+                .message(message)
+                .build();
+    }
+
+    private StudentAnalysis analyzeStudents(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Choose a non-empty student file.");
         }
@@ -55,7 +93,8 @@ public class StudentImportService {
             throw new IllegalArgumentException("The student file must have a header row and at least one student row.");
         }
         Map<String, Integer> columns = headerColumns(rows.get(headerRow));
-        List<Student> students = new ArrayList<>();
+        List<StudentCandidate> candidates = new ArrayList<>();
+        List<ImportRowError> errors = new ArrayList<>();
         Set<String> fileEmails = new HashSet<>();
         Set<String> fileEnrollmentNumbers = new HashSet<>();
         int skippedDuplicates = 0;
@@ -64,6 +103,11 @@ public class StudentImportService {
             String[] row = rows.get(index);
             if (Arrays.stream(row).allMatch(value -> value == null || value.isBlank())) continue;
             int rowNumber = index + 1;
+
+            if (row.length > 0 && CSV_PARSE_ERROR_MARKER.equals(row[0])) {
+                errors.add(new ImportRowError(rowNumber, row.length > 1 ? row[1] : "Malformed CSV row."));
+                continue;
+            }
 
             try {
                 String name = cell(row, columns, "name").trim();
@@ -86,32 +130,54 @@ public class StudentImportService {
                 }
                 fileEmails.add(email);
                 fileEnrollmentNumbers.add(enrollmentNumber);
-
-                students.add(Student.builder()
-                        .name(name)
-                        .email(email)
-                        .password(passwordEncoder.encode(password))
-                        .enrollmentNumber(enrollmentNumber)
-                        .semester(semester)
-                        .department(department)
-                        .build());
+                candidates.add(new StudentCandidate(rowNumber, name, email, password,
+                        enrollmentNumber, semester, department));
             } catch (IllegalArgumentException exception) {
-                throw new IllegalArgumentException("Row " + rowNumber + ": " + exception.getMessage());
+                errors.add(new ImportRowError(rowNumber, exception.getMessage()));
             }
         }
 
-        if (students.isEmpty() && skippedDuplicates == 0) {
-            throw new IllegalArgumentException("No student rows were found in the file.");
+        if (candidates.isEmpty() && skippedDuplicates == 0 && errors.isEmpty()) {
+            errors.add(new ImportRowError(headerRow + 2, "No student rows were found in the file."));
         }
 
-        studentRepository.saveAll(students);
-        String message = "Imported " + students.size() + " student(s); skipped " + skippedDuplicates + " duplicate(s).";
-        return StudentImportResponse.builder()
-                .imported(students.size())
-                .skippedDuplicates(skippedDuplicates)
-                .message(message)
-                .build();
+        List<ImportPreviewRow> previewRows = candidates.stream()
+                .limit(MAX_PREVIEW_ROWS)
+                .map(candidate -> {
+                    Map<String, String> values = new LinkedHashMap<>();
+                    values.put("Name", candidate.name());
+                    values.put("Email", candidate.email());
+                    values.put("Roll Number", candidate.enrollmentNumber());
+                    values.put("Semester", String.valueOf(candidate.semester()));
+                    values.put("Department", candidate.department().getDepartmentName());
+                    return new ImportPreviewRow(candidate.rowNumber(), values);
+                })
+                .toList();
+        return new StudentAnalysis(candidates, skippedDuplicates, errors, previewRows);
     }
+
+    private ImportPreviewResponse toPreview(StudentAnalysis analysis) {
+        boolean canImport = analysis.errors().isEmpty()
+                && (!analysis.candidates().isEmpty() || analysis.skippedDuplicates() > 0);
+        String message = canImport
+                ? "Ready to import " + analysis.candidates().size() + " student(s); "
+                        + analysis.skippedDuplicates() + " duplicate(s) will be skipped."
+                : "Fix the listed row errors before importing. No records were saved.";
+        return new ImportPreviewResponse(
+                analysis.candidates().size(),
+                analysis.skippedDuplicates(),
+                canImport,
+                analysis.candidates().size() > MAX_PREVIEW_ROWS,
+                analysis.previewRows(),
+                analysis.errors(),
+                List.of(),
+                message);
+    }
+
+    private record StudentCandidate(int rowNumber, String name, String email, String password,
+                                    String enrollmentNumber, int semester, Department department) { }
+    private record StudentAnalysis(List<StudentCandidate> candidates, int skippedDuplicates,
+                                   List<ImportRowError> errors, List<ImportPreviewRow> previewRows) { }
 
     private void validateStudentFields(String name, String email, String password,
                                        String enrollmentNumber, String semesterText) {
@@ -187,7 +253,7 @@ public class StudentImportService {
                 try {
                     rows.add(parseCsvLine(line));
                 } catch (IllegalArgumentException exception) {
-                    throw new IllegalArgumentException("Row " + rowNumber + ": " + exception.getMessage());
+                    rows.add(new String[] { CSV_PARSE_ERROR_MARKER, exception.getMessage() });
                 }
             }
         }

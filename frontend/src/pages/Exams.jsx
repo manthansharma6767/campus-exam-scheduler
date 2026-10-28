@@ -30,9 +30,10 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Loading from '../components/Loading';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ImportPreviewPanel from '../components/ImportPreviewPanel';
 import api from '../services/api';
 
-const emptyForm = { examDate: '', examTime: '', roomNumber: '', subjectId: '', building: '' };
+const emptyForm = { examDate: '', examTime: '', examEndTime: '', roomNumber: '', subjectId: '', building: '' };
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -62,6 +63,11 @@ export default function Exams() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [submitting, setSubmitting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importPreview, setImportPreview] = useState(null);
+  const [importError, setImportError] = useState('');
+  const [importAction, setImportAction] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -98,6 +104,7 @@ export default function Exams() {
     setForm({
       examDate: exam.examDate || '',
       examTime: exam.examTime ? exam.examTime.substring(0, 5) : '',
+      examEndTime: exam.examEndTime ? exam.examEndTime.substring(0, 5) : '',
       roomNumber: exam.roomNumber,
       subjectId: exam.subjectId,
       building: exam.building,
@@ -109,6 +116,7 @@ export default function Exams() {
   const validate = () => {
     if (!form.examDate) return 'Exam date is required';
     if (!form.examTime) return 'Exam time is required';
+    if (form.examEndTime && form.examEndTime <= form.examTime) return 'Exam end time must be later than its start time';
     if (!form.roomNumber.trim()) return 'Room number is required';
     if (!form.subjectId) return 'Subject is required';
     if (!form.building.trim()) return 'Building is required';
@@ -123,6 +131,7 @@ export default function Exams() {
       const payload = {
         examDate: form.examDate,
         examTime: form.examTime + ':00',
+        examEndTime: form.examEndTime ? `${form.examEndTime}:00` : null,
         roomNumber: form.roomNumber.trim(),
         subjectId: parseInt(form.subjectId, 10),
         building: form.building.trim(),
@@ -156,22 +165,64 @@ export default function Exams() {
     }
   };
 
-  const handleTimetableImport = async (event) => {
+  const handleTimetablePreview = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportAction('preview');
+    setImportError('');
+    try {
+      const body = new FormData();
+      body.append('file', importFile);
+      const response = await api.post('/api/exams/import/preview', body);
+      setImportPreview(response.data);
+    } catch (err) {
+      if (err.response?.data?.errors) setImportPreview(err.response.data);
+      setImportError(err.response?.data?.message || 'Timetable preview failed. Check the file and try again.');
+    } finally {
+      setImporting(false);
+      setImportAction('');
+    }
+  };
+
+  const handleTimetableImport = async () => {
+    if (!importFile || !importPreview?.canImport) return;
+    setImporting(true);
+    setImportAction('commit');
+    setImportError('');
+    try {
+      const body = new FormData();
+      body.append('file', importFile);
+      const response = await api.post('/api/exams/import', body);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      setImportDialogOpen(false);
+      setImportFile(null);
+      setImportPreview(null);
+      fetchData();
+    } catch (err) {
+      if (err.response?.data?.errors || err.response?.data?.conflicts) setImportPreview(err.response.data);
+      setImportError(err.response?.data?.message || 'Timetable import failed. Check the file and try again.');
+    } finally {
+      setImporting(false);
+      setImportAction('');
+    }
+  };
+
+  const closeImportDialog = () => {
+    if (importing) return;
+    setImportDialogOpen(false);
+    setImportFile(null);
+    setImportPreview(null);
+    setImportError('');
+  };
+
+  const handleTimetableFileSelection = (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    const body = new FormData();
-    body.append('file', file);
-    setImporting(true);
-    try {
-      const response = await api.post('/api/exams/import', body);
-      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
-      fetchData();
-    } catch (err) {
-      setSnackbar({ open: true, message: err.response?.data?.message || 'Timetable import failed', severity: 'error' });
-    } finally {
-      setImporting(false);
-    }
+    setImportFile(file);
+    setImportPreview(null);
+    setImportError('');
+    setImportDialogOpen(true);
   };
 
   return (
@@ -198,7 +249,7 @@ export default function Exams() {
               <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} disabled={importing}
                 sx={{ borderColor: '#FF8F00', color: '#FFB300', '&:hover': { borderColor: '#FFB300' } }}>
                 {importing ? 'Importing...' : 'Import timetable'}
-                <input hidden type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleTimetableImport} />
+                <input hidden type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleTimetableFileSelection} />
               </Button>
               <Button id="add-exam-button" variant="contained" startIcon={<AddIcon />} onClick={openAdd}
                 sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
@@ -240,7 +291,7 @@ export default function Exams() {
                           </Box>
                         </TableCell>
                         <TableCell>{formatDate(exam.examDate)}</TableCell>
-                        <TableCell>{formatTime(exam.examTime)}</TableCell>
+                        <TableCell>{formatTime(exam.examTime)}{exam.examEndTime ? ` – ${formatTime(exam.examEndTime)}` : ''}</TableCell>
                         <TableCell>{exam.building}</TableCell>
                         <TableCell>{exam.roomNumber}</TableCell>
                         <TableCell align="right">
@@ -260,6 +311,40 @@ export default function Exams() {
           </Container>
         </Box>
 
+        <Dialog open={importDialogOpen} onClose={closeImportDialog} maxWidth="md" fullWidth aria-labelledby="timetable-import-title">
+          <DialogTitle id="timetable-import-title">Import timetable</DialogTitle>
+          <DialogContent>
+            {importError && <Alert severity="error" sx={{ mt: 1, mb: 2 }}>{importError}</Alert>}
+            <Typography color="text.secondary" sx={{ mb: 2 }}>
+              Review the parsed timetable and resolve validation errors or room/student schedule conflicts before saving. Nothing is saved during preview.
+            </Typography>
+            <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} disabled={importing}>
+              Choose PDF or Excel file
+              <input hidden type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  event.target.value = '';
+                  setImportFile(file);
+                  setImportPreview(null);
+                  setImportError('');
+                }} />
+            </Button>
+            <Typography component="span" sx={{ ml: 1.5, color: 'text.secondary', overflowWrap: 'anywhere' }}>
+              {importFile?.name || 'No file selected'}
+            </Typography>
+            <ImportPreviewPanel preview={importPreview} />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={closeImportDialog} color="inherit" variant="outlined" disabled={importing}>Cancel</Button>
+            <Button onClick={handleTimetablePreview} variant="outlined" disabled={importing || !importFile}>
+              {importing && importAction === 'preview' ? 'Checking...' : 'Preview timetable'}
+            </Button>
+            <Button onClick={handleTimetableImport} variant="contained" disabled={importing || !importFile || !importPreview?.canImport}>
+              {importing && importAction === 'commit' ? 'Importing...' : 'Confirm import'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* Add/Edit Dialog */}
         <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth aria-labelledby="exam-dialog-title">
           <DialogTitle id="exam-dialog-title">{editing ? 'Edit Exam' : 'Add Exam'}</DialogTitle>
@@ -278,6 +363,9 @@ export default function Exams() {
                 slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Exam date' } }} fullWidth />
               <TextField name="examTime" label="Exam Time" type="time" value={form.examTime} onChange={handleChange}
                 slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Exam time' } }} fullWidth />
+              <TextField name="examEndTime" label="Exam End Time (optional)" type="time" value={form.examEndTime} onChange={handleChange}
+                helperText="Add an end time to detect exams that overlap even when they start at different times."
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Exam end time' } }} fullWidth />
               <TextField name="building" label="Building" value={form.building} onChange={handleChange}
                 placeholder="e.g. Main Building" slotProps={{ htmlInput: { 'aria-label': 'Building name', maxLength: 100 } }} fullWidth />
               <TextField name="roomNumber" label="Room Number" value={form.roomNumber} onChange={handleChange}

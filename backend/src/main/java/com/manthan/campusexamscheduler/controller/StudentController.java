@@ -21,6 +21,11 @@ public class StudentController {
     private final StudentService studentService;
     private final StudentImportService studentImportService;
 
+    @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ImportPreviewResponse> previewStudents(@RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(studentImportService.previewStudents(file));
+    }
+
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<StudentImportResponse> importStudents(@RequestPart("file") MultipartFile file) {
         return ResponseEntity.ok(studentImportService.importStudents(file));

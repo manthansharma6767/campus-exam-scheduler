@@ -3,8 +3,13 @@ package com.manthan.campusexamscheduler.service;
 import com.manthan.campusexamscheduler.dto.ConflictDetail;
 import com.manthan.campusexamscheduler.dto.ImportRowError;
 import com.manthan.campusexamscheduler.dto.TimetableImportResponse;
+import com.manthan.campusexamscheduler.dto.ConflictDetail;
+import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
+import com.manthan.campusexamscheduler.dto.ImportPreviewRow;
+import com.manthan.campusexamscheduler.dto.ImportRowError;
 import com.manthan.campusexamscheduler.entity.Exam;
 import com.manthan.campusexamscheduler.entity.Subject;
+import com.manthan.campusexamscheduler.exception.ImportValidationException;
 import com.manthan.campusexamscheduler.repository.ExamRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +35,9 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class TimetableImportService {
 
-    private static final Set<String> REQUIRED_HEADERS = Set.of("subjectcode", "date", "time", "building", "room");
+    private static final int MAX_PREVIEW_ROWS = 200;
+
+    private static final Set<String> REQUIRED_HEADERS = Set.of("subjectCode", "date", "time", "building", "room");
     private static final Pattern MATRIX_DATE = Pattern.compile("(?i)^\\d{1,2}-[a-z]{3}-\\d{2,4}$");
     private static final Pattern MATRIX_SUBJECT_CODE = Pattern.compile(
             "(?i)^(?=.*[a-z])(?=.*\\d)[a-z0-9]{8,}(?:-[a-z0-9]+)*$");
@@ -66,9 +73,31 @@ public class TimetableImportService {
 
     private final ExamRepository examRepository;
     private final SubjectRepository subjectRepository;
+    private final ScheduleConflictService scheduleConflictService;
+
+    @Transactional(readOnly = true)
+    public ImportPreviewResponse previewTimetable(MultipartFile file) {
+        return toPreview(analyzeTimetable(file));
+    }
 
     @Transactional
     public TimetableImportResponse importTimetable(MultipartFile file) {
+        TimetableAnalysis analysis = analyzeTimetable(file);
+        ImportPreviewResponse preview = toPreview(analysis);
+        if (!preview.canImport()) {
+            throw new ImportValidationException(preview);
+        }
+
+        examRepository.saveAll(analysis.candidates().stream().map(ExamCandidate::exam).toList());
+        return TimetableImportResponse.builder()
+                .imported(analysis.candidates().size())
+                .skippedDuplicates(analysis.skippedDuplicates())
+                .message("Imported " + analysis.candidates().size() + " exam(s); skipped "
+                        + analysis.skippedDuplicates() + " duplicate(s).")
+                .build();
+    }
+
+    private TimetableAnalysis analyzeTimetable(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Choose a non-empty timetable file.");
         }
@@ -92,8 +121,13 @@ public class TimetableImportService {
             throw new IllegalArgumentException("The timetable must contain a header row and at least one exam row.");
         }
         Map<String, Integer> columns = headerColumns(rows.get(headerRow));
+<<<<<<< HEAD
 
         List<Exam> exams = new ArrayList<>();
+=======
+        List<ExamCandidate> candidates = new ArrayList<>();
+        List<ImportRowError> errors = new ArrayList<>();
+>>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
         Set<String> seenInFile = new HashSet<>();
         List<ImportRowError> rowErrors = new ArrayList<>();
         List<ConflictDetail> conflicts = new ArrayList<>();
@@ -115,6 +149,7 @@ public class TimetableImportService {
                 String subjectCode = normalizeSubjectCode(cell(row, columns, "subjectCode"));
                 String rawDate = cell(row, columns, "date").trim();
                 String rawTime = cell(row, columns, "time").trim();
+                String rawEndTime = cell(row, columns, "endTime").trim();
                 String building = cell(row, columns, "building").trim();
                 String room = cell(row, columns, "room").trim();
                 if (subjectCode.isBlank() || building.isBlank() || room.isBlank()) {
@@ -147,11 +182,34 @@ public class TimetableImportService {
                     rowErrors.add(ImportRowError.builder().row(rowNumber).message(exception.getMessage()).build());
                     continue;
                 }
+<<<<<<< HEAD
+=======
+                Subject subject = subjectRepository.findBySubjectCode(subjectCode)
+                        .orElseThrow(() -> new IllegalArgumentException("no subject matches code " + subjectCode));
+                LocalDate date = parseDate(rawDate);
+                TimeRange timeRange = parseTimeRange(rawTime);
+                LocalTime time = timeRange.startTime();
+                LocalTime endTime = timeRange.endTime();
+                if (!rawEndTime.isBlank()) {
+                    TimeRange explicitEnd = parseTimeRange(rawEndTime);
+                    if (explicitEnd.endTime() != null) {
+                        throw new IllegalArgumentException("End Time must contain one time value, not a range.");
+                    }
+                    if (endTime != null && !endTime.equals(explicitEnd.startTime())) {
+                        throw new IllegalArgumentException("Time range and End Time column do not match.");
+                    }
+                    endTime = explicitEnd.startTime();
+                    if (!endTime.isAfter(time)) {
+                        throw new IllegalArgumentException("exam end time must be later than its start time");
+                    }
+                }
+>>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
                 String identity = subject.getSubjectId() + "|" + date + "|" + time;
                 if (!seenInFile.add(identity) || examRepository.existsBySubject_SubjectIdAndExamDateAndExamTime(subject.getSubjectId(), date, time)) {
                     skippedDuplicates++;
                     continue;
                 }
+<<<<<<< HEAD
 
                 // Room/time conflict detection
                 boolean notAssigned = "Not assigned".equalsIgnoreCase(building) && "Not assigned".equalsIgnoreCase(room);
@@ -191,13 +249,19 @@ public class TimetableImportService {
                 existingSubjects.add(subjectCode);
 
                 exams.add(Exam.builder()
+=======
+                Exam exam = Exam.builder()
+>>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
                         .subject(subject)
                         .examDate(date)
                         .examTime(time)
+                        .examEndTime(endTime)
                         .building(building)
                         .roomNumber(room)
-                        .build());
+                        .build();
+                candidates.add(new ExamCandidate(rowNumber, exam));
             } catch (IllegalArgumentException exception) {
+<<<<<<< HEAD
                 rowErrors.add(ImportRowError.builder().row(rowNumber).message(exception.getMessage()).build());
             }
         }
@@ -234,6 +298,71 @@ public class TimetableImportService {
                 .build();
     }
 
+=======
+                errors.add(new ImportRowError(rowNumber, exception.getMessage()));
+            }
+        }
+
+        if (candidates.isEmpty() && skippedDuplicates == 0 && errors.isEmpty()) {
+            errors.add(new ImportRowError(headerRow + 2, "No exam rows were found in the timetable."));
+        }
+
+        List<Exam> existing = examRepository.findAllWithSubject();
+        List<Exam> seenCandidates = new ArrayList<>();
+        List<ConflictDetail> conflicts = new ArrayList<>();
+        for (ExamCandidate candidate : candidates) {
+            List<Exam> scheduled = new ArrayList<>(existing);
+            scheduled.addAll(seenCandidates);
+            conflicts.addAll(scheduleConflictService.findConflicts(
+                    candidate.exam(), scheduled, candidate.rowNumber(), null));
+            seenCandidates.add(candidate.exam());
+        }
+
+        List<ImportPreviewRow> previewRows = candidates.stream()
+                .limit(MAX_PREVIEW_ROWS)
+                .map(candidate -> {
+                    Exam exam = candidate.exam();
+                    Map<String, String> values = new LinkedHashMap<>();
+                    values.put("Subject", exam.getSubject().getSubjectCode());
+                    values.put("Date", exam.getExamDate().toString());
+                    values.put("Time", formatTimeRange(exam.getExamTime(), exam.getExamEndTime()));
+                    values.put("Building", exam.getBuilding());
+                    values.put("Room", exam.getRoomNumber());
+                    return new ImportPreviewRow(candidate.rowNumber(), values);
+                })
+                .toList();
+        return new TimetableAnalysis(candidates, skippedDuplicates, errors, conflicts, previewRows);
+    }
+
+    private ImportPreviewResponse toPreview(TimetableAnalysis analysis) {
+        boolean canImport = analysis.errors().isEmpty() && analysis.conflicts().isEmpty()
+                && (!analysis.candidates().isEmpty() || analysis.skippedDuplicates() > 0);
+        String message;
+        if (canImport) {
+            message = "Ready to import " + analysis.candidates().size() + " exam(s); "
+                    + analysis.skippedDuplicates() + " duplicate(s) will be skipped.";
+        } else {
+            message = "Fix the listed row errors and schedule conflicts before importing. No records were saved.";
+        }
+        return new ImportPreviewResponse(
+                analysis.candidates().size(),
+                analysis.skippedDuplicates(),
+                canImport,
+                analysis.candidates().size() > MAX_PREVIEW_ROWS,
+                analysis.previewRows(),
+                analysis.errors(),
+                analysis.conflicts(),
+                message);
+    }
+
+    private record ExamCandidate(int rowNumber, Exam exam) { }
+    private record TimetableAnalysis(
+            List<ExamCandidate> candidates,
+            int skippedDuplicates,
+            List<ImportRowError> errors,
+            List<ConflictDetail> conflicts,
+            List<ImportPreviewRow> previewRows) { }
+>>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
 
     private List<String[]> readSpreadsheet(MultipartFile file) throws IOException {
         List<String[]> rows = new ArrayList<>();
@@ -243,6 +372,7 @@ public class TimetableImportService {
             Sheet sheet = workbook.getSheetAt(0);
             int dateColumn = -1;
             int timeColumn = -1;
+            int endTimeColumn = -1;
             for (Row row : sheet) {
                 int width = Math.max(row.getLastCellNum(), 0);
                 String[] values = new String[width];
@@ -254,10 +384,11 @@ public class TimetableImportService {
                     Map<String, Integer> headers = headerColumns(values);
                     dateColumn = headers.get("date");
                     timeColumn = headers.get("time");
+                    endTimeColumn = headers.getOrDefault("endTime", -1);
                 } catch (IllegalArgumentException ignored) {
                     // The sheet may have a title or notes before its actual header row.
                 }
-                for (int column : new int[] { dateColumn, timeColumn }) {
+                for (int column : new int[] { dateColumn, timeColumn, endTimeColumn }) {
                     if (column < 0 || column >= width) continue;
                     Cell cell = row.getCell(column, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
                     if (cell == null || cell.getCellType() != CellType.NUMERIC) continue;
@@ -373,7 +504,7 @@ public class TimetableImportService {
     private List<String[]> parseMatrixPdf(List<PdfLine> lines) {
         List<PdfTimeHeader> timeHeaders = lines.stream()
                 .map(line -> new PdfTimeHeader(line.page(), line.y(), matrixTime(line.text())))
-                .filter(header -> header.time() != null)
+                .filter(header -> header.timeRange() != null)
                 .sorted(Comparator.comparingInt(PdfTimeHeader::page).thenComparingDouble(PdfTimeHeader::y))
                 .toList();
         if (timeHeaders.isEmpty()) return null;
@@ -417,7 +548,7 @@ public class TimetableImportService {
                     rows.add(new String[] {
                             subjectCode,
                             date.toString(),
-                            session.time().toString(),
+                            formatTimeRange(session.timeRange().startTime(), session.timeRange().endTime()),
                             "Not assigned",
                             "Not assigned"
                     });
@@ -427,12 +558,12 @@ public class TimetableImportService {
         return foundMatrix ? rows : null;
     }
 
-    private LocalTime matrixTime(String line) {
+    private TimeRange matrixTime(String line) {
         Matcher matcher = MATRIX_TIME_LABEL.matcher(line);
         if (!matcher.find()) return null;
         String value = matcher.group(1).replaceAll("(?i)\\s+(?:MDM|HM)\\b.*$", "").trim();
         try {
-            return parseTime(value);
+            return parseTimeRange(value);
         } catch (IllegalArgumentException ignored) {
             return null;
         }
@@ -635,21 +766,22 @@ public class TimetableImportService {
                 case "subject", "subjectcode", "subjectcodename", "subjectid", "papercode", "course", "coursecode", "courseid", "code" -> "subjectCode";
                 case "date", "examdate", "dateofexam", "examinationdate" -> "date";
                 case "time", "examtime", "examinationtime", "starttime", "timeslot", "timing" -> "time";
+                case "endtime", "examendtime", "examinationendtime", "until" -> "endTime";
                 case "building", "venue", "examvenue", "examcenter", "examcentre", "location", "campus", "block" -> "building";
                 case "room", "roomnumber", "roomno", "classroom", "hall", "hallnumber" -> "room";
                 default -> null;
             };
             if (key != null) columns.put(key, index);
         }
-        if (columns.size() != REQUIRED_HEADERS.size()) {
+        if (!columns.keySet().containsAll(REQUIRED_HEADERS)) {
             throw new IllegalArgumentException("Required headers: Subject Code, Date, Time, Building, Room. Use those labels or their common equivalents.");
         }
         return columns;
     }
 
     private String cell(String[] row, Map<String, Integer> columns, String name) {
-        int index = columns.get(name);
-        return index < row.length ? row[index] : "";
+        Integer index = columns.get(name);
+        return index != null && index < row.length ? row[index] : "";
     }
 
     private LocalDate parseDate(String value) {
@@ -661,11 +793,28 @@ public class TimetableImportService {
         throw new IllegalArgumentException("invalid date '" + value + "' (use YYYY-MM-DD)");
     }
 
-    private LocalTime parseTime(String value) {
-        String startTime = value.trim()
+    private TimeRange parseTimeRange(String value) {
+        String normalizedValue = value.trim()
                 .replaceAll("^[\\[(]+|[\\])]+$", "")
-                .split("\\s*(?:-|–|—|\\bto\\b)\\s*", 2)[0];
-        String normalized = startTime.toUpperCase(Locale.ROOT)
+                .trim();
+        String[] parts = normalizedValue.split("(?i)\\s*(?:-|–|—|\\bto\\b)\\s*", 2);
+        LocalTime startTime = parseSingleTime(parts[0]);
+        LocalTime endTime = parts.length > 1 ? parseSingleTime(parts[1]) : null;
+        if (endTime != null && !endTime.isAfter(startTime)) {
+            throw new IllegalArgumentException("exam end time must be later than its start time");
+        }
+        return new TimeRange(startTime, endTime);
+    }
+
+    private LocalTime parseTime(String value) {
+        return parseTimeRange(value).startTime();
+    }
+
+    private LocalTime parseSingleTime(String value) {
+        String normalized = value.trim()
+                .replaceAll("^[\\[(]+|[\\])]+$", "")
+                .trim()
+                .toUpperCase(Locale.ROOT)
                 .replaceAll("A\\.?M\\.?", "AM")
                 .replaceAll("P\\.?M\\.?", "PM")
                 .replace('.', ':')
@@ -681,9 +830,14 @@ public class TimetableImportService {
         throw new IllegalArgumentException("invalid time '" + value + "' (use HH:mm or h:mm AM/PM)");
     }
 
+    private String formatTimeRange(LocalTime start, LocalTime end) {
+        return end == null ? start.toString() : start + "–" + end;
+    }
+
     private record PdfLineKey(int page, float y) { }
     private record PdfLine(int page, float y, String text, List<PdfWord> words) { }
-    private record PdfTimeHeader(int page, float y, LocalTime time) { }
+    private record PdfTimeHeader(int page, float y, TimeRange timeRange) { }
+    private record TimeRange(LocalTime startTime, LocalTime endTime) { }
     private record PdfWord(String text, float startX, float endX) { }
     private record PdfCell(String text, float startX, float endX) { }
 }

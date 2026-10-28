@@ -29,6 +29,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Loading from '../components/Loading';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ImportPreviewPanel from '../components/ImportPreviewPanel';
 import api from '../services/api';
 
 const emptyForm = { name: '', email: '', password: '', enrollmentNumber: '', semester: '', departmentId: '' };
@@ -49,6 +50,8 @@ export default function Students() {
   const [importFile, setImportFile] = useState(null);
   const [importError, setImportError] = useState('');
   const [importing, setImporting] = useState(false);
+  const [importAction, setImportAction] = useState('');
+  const [importPreview, setImportPreview] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -172,12 +175,32 @@ export default function Students() {
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = async () => {
+  const handleImportPreview = async () => {
     if (!importFile) {
       setImportError('Choose a CSV or Excel file first.');
       return;
     }
     setImporting(true);
+    setImportAction('preview');
+    setImportError('');
+    try {
+      const data = new FormData();
+      data.append('file', importFile);
+      const response = await api.post('/api/students/import/preview', data);
+      setImportPreview(response.data);
+    } catch (err) {
+      if (err.response?.data?.errors) setImportPreview(err.response.data);
+      setImportError(err.response?.data?.message || 'Student file preview failed. Check the file and try again.');
+    } finally {
+      setImporting(false);
+      setImportAction('');
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile || !importPreview?.canImport) return;
+    setImporting(true);
+    setImportAction('commit');
     setImportError('');
     try {
       const data = new FormData();
@@ -186,12 +209,23 @@ export default function Students() {
       setSnackbar({ open: true, message: response.data.message, severity: 'success' });
       setImportDialogOpen(false);
       setImportFile(null);
+      setImportPreview(null);
       fetchData();
     } catch (err) {
+      if (err.response?.data?.errors) setImportPreview(err.response.data);
       setImportError(err.response?.data?.message || 'Student import failed. Check the file and try again.');
     } finally {
       setImporting(false);
+      setImportAction('');
     }
+  };
+
+  const closeImportDialog = () => {
+    if (importing) return;
+    setImportDialogOpen(false);
+    setImportFile(null);
+    setImportPreview(null);
+    setImportError('');
   };
 
   return (
@@ -216,7 +250,7 @@ export default function Students() {
           <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
               <Button id="import-students-button" variant="outlined" startIcon={<UploadFileIcon />}
-                onClick={() => { setImportError(''); setImportDialogOpen(true); }}
+                onClick={() => { setImportError(''); setImportPreview(null); setImportFile(null); setImportDialogOpen(true); }}
                 sx={{ color: '#FFB74D', borderColor: 'rgba(255,183,77,0.5)', '&:hover': { borderColor: '#FFB74D', backgroundColor: 'rgba(255,183,77,0.08)' } }}>
                 Import Students
               </Button>
@@ -271,7 +305,7 @@ export default function Students() {
           </Container>
         </Box>
 
-        <Dialog open={importDialogOpen} onClose={() => !importing && setImportDialogOpen(false)} maxWidth="sm" fullWidth aria-labelledby="student-import-title">
+        <Dialog open={importDialogOpen} onClose={closeImportDialog} maxWidth="md" fullWidth aria-labelledby="student-import-title">
           <DialogTitle id="student-import-title">Import Students</DialogTitle>
           <DialogContent>
             {importError && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{importError}</Alert>}
@@ -289,8 +323,11 @@ export default function Students() {
                   type="file"
                   accept=".csv,.xls,.xlsx"
                   onChange={(event) => {
-                    setImportFile(event.target.files?.[0] || null);
+                    const file = event.target.files?.[0] || null;
+                    event.target.value = '';
+                    setImportFile(file);
                     setImportError('');
+                    setImportPreview(null);
                   }}
                 />
               </Button>
@@ -299,14 +336,19 @@ export default function Students() {
               </Typography>
             </Box>
             <Alert severity="info" sx={{ mt: 2 }}>
-              Duplicate emails or roll numbers are skipped. If a row is invalid, the entire import is rejected. Passwords are hashed before they are saved.
+              Preview checks the whole file first. Duplicate emails or roll numbers are skipped; any invalid row blocks the complete import. Passwords are never shown in the preview and are hashed before saving.
             </Alert>
+            <ImportPreviewPanel preview={importPreview} />
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setImportDialogOpen(false)} color="inherit" variant="outlined" disabled={importing}>Cancel</Button>
-            <Button onClick={handleImport} variant="contained" disabled={importing || !importFile}
+            <Button onClick={closeImportDialog} color="inherit" variant="outlined" disabled={importing}>Cancel</Button>
+            <Button onClick={handleImportPreview} variant="outlined" disabled={importing || !importFile}
+              sx={{ borderColor: '#FF8F00', color: '#FFB300' }}>
+              {importing && importAction === 'preview' ? 'Checking...' : 'Preview import'}
+            </Button>
+            <Button onClick={handleImport} variant="contained" disabled={importing || !importFile || !importPreview?.canImport}
               sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
-              {importing ? 'Importing...' : 'Import Students'}
+              {importing && importAction === 'commit' ? 'Importing...' : 'Confirm import'}
             </Button>
           </DialogActions>
         </Dialog>

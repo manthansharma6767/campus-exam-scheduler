@@ -4,14 +4,18 @@ import com.manthan.campusexamscheduler.dto.AdministratorRequest;
 import com.manthan.campusexamscheduler.dto.AuthenticationRequest;
 import com.manthan.campusexamscheduler.dto.DepartmentRequest;
 import com.manthan.campusexamscheduler.dto.ExamRequest;
+import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
 import com.manthan.campusexamscheduler.dto.StudentRequest;
 import com.manthan.campusexamscheduler.dto.SubjectRequest;
 import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
+import com.manthan.campusexamscheduler.exception.ImportValidationException;
+import com.manthan.campusexamscheduler.exception.ScheduleConflictException;
 import com.manthan.campusexamscheduler.service.AuthenticationService;
 import com.manthan.campusexamscheduler.service.DepartmentService;
 import com.manthan.campusexamscheduler.service.ExamService;
 import com.manthan.campusexamscheduler.service.StudentImportService;
 import com.manthan.campusexamscheduler.service.StudentService;
+import com.manthan.campusexamscheduler.service.StudentImportService;
 import com.manthan.campusexamscheduler.service.SubjectService;
 import com.manthan.campusexamscheduler.service.SeatingPlanService;
 import com.manthan.campusexamscheduler.service.TimetableImportService;
@@ -42,9 +46,12 @@ import java.time.LocalTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -99,6 +106,111 @@ class SchedulerWorkflowIntegrationTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
                 .apply(springSecurity())
                 .build();
+    }
+
+    @Test
+    void adminEndpointsReturnUnauthorizedWhenNoTokenIsProvided() throws Exception {
+        mockMvc.perform(get("/api/departments"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void studentImportPreviewReportsAllErrorsWithoutSavingOrExposingPasswords() throws Exception {
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName("Bulk Preview Department").build());
+        MockMultipartFile invalidRoster = csvFile("students.csv", """
+                Name,Email,Password,Roll Number,Semester,Department
+                Valid Student,valid.preview@example.com,SecretPass123,RBPREVIEW1,5,%s
+                Invalid Student,not-an-email,short,RBPREVIEW2,5,%s
+                """.formatted(department.getDepartmentName(), department.getDepartmentName()));
+
+        ImportPreviewResponse preview = studentImportService.previewStudents(invalidRoster);
+
+        assertEquals(1, preview.validRows());
+        assertEquals(1, preview.errors().size());
+        assertFalse(preview.canImport());
+        assertFalse(preview.rows().toString().contains("SecretPass123"));
+        assertFalse(studentService.getAllStudents().stream()
+                .anyMatch(student -> student.getEmail().equals("valid.preview@example.com")));
+        assertThrows(ImportValidationException.class,
+                () -> studentImportService.importStudents(invalidRoster));
+        assertFalse(studentService.getAllStudents().stream()
+                .anyMatch(student -> student.getEmail().equals("valid.preview@example.com")));
+
+        MockMultipartFile validRoster = csvFile("students.csv", """
+                Name,Email,Password,Roll Number,Semester,Department
+                Valid Student,valid.preview@example.com,SecretPass123,RBPREVIEW1,5,%s
+                """.formatted(department.getDepartmentName()));
+        mockMvc.perform(multipart("/api/students/import/preview").file(validRoster).with(user("test-admin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canImport").value(true))
+                .andExpect(jsonPath("$.rows[0].values.Password").doesNotExist());
+        ImportPreviewResponse validPreview = studentImportService.previewStudents(validRoster);
+        assertTrue(validPreview.canImport());
+        assertEquals(1, studentImportService.importStudents(validRoster).getImported());
+        assertTrue(studentService.getAllStudents().stream()
+                .anyMatch(student -> student.getEmail().equals("valid.preview@example.com")));
+    }
+
+    @Test
+    void timetablePreviewCollectsRowErrorsAndScheduleConflictsWithoutSaving() throws Exception {
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName("Schedule Conflict Department").build());
+        var firstSubject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode("CF101").subjectName("Conflict One").semester(3)
+                .departmentId(department.getDepartmentId()).build());
+        var secondSubject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode("CF102").subjectName("Conflict Two").semester(3)
+                .departmentId(department.getDepartmentId()).build());
+        long examsBefore = examService.getAllExams().size();
+        MockMultipartFile timetable = new MockMultipartFile("file", "conflicts.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                spreadsheetBytes(new String[][] {
+                        {"CF101", "2098-12-31", "09:00-11:00", "Conflict Hall", "101"},
+                        {"CF102", "2098-12-31", "10:30-12:00", "Conflict Hall", "101"},
+                        {"UNKNOWN", "not-a-date", "09:00", "Other Hall", "202"}
+                }));
+
+        ImportPreviewResponse preview = timetableImportService.previewTimetable(timetable);
+
+        assertEquals(2, preview.validRows());
+        assertEquals(1, preview.errors().size());
+        assertEquals(2, preview.conflicts().size());
+        assertEquals("09:00–11:00", preview.rows().get(0).values().get("Time"));
+        assertFalse(preview.canImport());
+        assertEquals(examsBefore, examService.getAllExams().size());
+        mockMvc.perform(multipart("/api/exams/import/preview").file(timetable).with(user("test-admin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canImport").value(false))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.conflicts.length()").value(2));
+        mockMvc.perform(multipart("/api/exams/import").file(timetable).with(user("test-admin")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.canImport").value(false));
+        assertThrows(ImportValidationException.class,
+                () -> timetableImportService.importTimetable(timetable));
+        assertEquals(examsBefore, examService.getAllExams().size());
+
+        ExamRequest firstExam = examRequest(firstSubject.getSubjectId(),
+                LocalDate.of(2098, 12, 30), LocalTime.of(9, 0));
+        examService.createExam(firstExam);
+        ExamRequest cohortConflict = ExamRequest.builder()
+                .examDate(LocalDate.of(2098, 12, 30))
+                .examTime(LocalTime.of(10, 30))
+                .examEndTime(LocalTime.of(12, 0))
+                .building("Another Hall")
+                .roomNumber("202")
+                .subjectId(secondSubject.getSubjectId())
+                .build();
+        assertThrows(ScheduleConflictException.class, () -> examService.createExam(cohortConflict));
+        assertThrows(IllegalArgumentException.class, () -> examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2098, 12, 30))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(9, 0))
+                .roomNumber("303")
+                .building("Other Hall")
+                .subjectId(firstSubject.getSubjectId())
+                .build()));
     }
 
     @Test
@@ -341,6 +453,7 @@ class SchedulerWorkflowIntegrationTest {
         return ExamRequest.builder()
                 .examDate(date)
                 .examTime(time)
+                .examEndTime(time.plusHours(2))
                 .roomNumber("A-205")
                 .subjectId(subjectId)
                 .building("Main Building")
@@ -348,6 +461,10 @@ class SchedulerWorkflowIntegrationTest {
     }
 
     private byte[] spreadsheetBytes() throws Exception {
+        return spreadsheetBytes(new String[][] {{"CS101", "2026-11-13", "13:30", "Science Block", "B-110"}});
+    }
+
+    private byte[] spreadsheetBytes(String[][] exams) throws Exception {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             var sheet = workbook.createSheet("Timetable");
             Row header = sheet.createRow(0);
@@ -355,15 +472,19 @@ class SchedulerWorkflowIntegrationTest {
             for (int column = 0; column < headers.length; column++) {
                 header.createCell(column).setCellValue(headers[column]);
             }
-            Row exam = sheet.createRow(1);
-            exam.createCell(0).setCellValue("CS101");
-            exam.createCell(1).setCellValue("2026-11-13");
-            exam.createCell(2).setCellValue("13:30");
-            exam.createCell(3).setCellValue("Science Block");
-            exam.createCell(4).setCellValue("B-110");
+            for (int index = 0; index < exams.length; index++) {
+                Row exam = sheet.createRow(index + 1);
+                for (int column = 0; column < exams[index].length; column++) {
+                    exam.createCell(column).setCellValue(exams[index][column]);
+                }
+            }
             workbook.write(output);
             return output.toByteArray();
         }
+    }
+
+    private MockMultipartFile csvFile(String name, String content) {
+        return new MockMultipartFile("file", name, "text/csv", content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private byte[] matrixPdfBytes() throws Exception {

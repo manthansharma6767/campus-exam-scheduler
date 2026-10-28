@@ -58,7 +58,7 @@ export default function MySchedule() {
                 <Box sx={{ display: 'flex', alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 3 }}>
                   <Typography variant="h5" sx={{ color: '#FFB300', fontWeight: 700 }}>{exams.length} saved exam{exams.length === 1 ? '' : 's'}</Typography>
                   <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <TextField select size="small" label="Exam duration" value={duration} onChange={(event) => setDuration(Number(event.target.value))} sx={{ minWidth: 150 }}>
+                    <TextField select size="small" label="Fallback duration" value={duration} onChange={(event) => setDuration(Number(event.target.value))} sx={{ minWidth: 170 }}>
                       {[60, 90, 120, 180, 240].map((minutes) => <MenuItem key={minutes} value={minutes}>{minutes / 60} hour{minutes === 60 ? '' : 's'}</MenuItem>)}
                     </TextField>
                     <Button variant="contained" startIcon={<DownloadIcon />} onClick={() => downloadCalendar(exams, duration)}>
@@ -66,7 +66,7 @@ export default function MySchedule() {
                     </Button>
                   </Box>
                 </Box>
-                <Alert severity="info" sx={{ mb: 3 }}>Calendar events use the selected duration and India Standard Time. You can change the duration before exporting.</Alert>
+                <Alert severity="info" sx={{ mb: 3 }}>Calendar events use imported or saved end times when available. The selected fallback duration applies to exams without an end time. Events use India Standard Time.</Alert>
                 <Grid container spacing={3}>
                   {exams.map((exam) => (
                     <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={`${exam.enrollmentNumber}-${exam.subjectCode}-${exam.examDate}-${exam.examTime}`}>

@@ -21,6 +21,8 @@ public class ExamRequest {
     @NotNull
     private LocalTime examTime;
 
+    private LocalTime examEndTime;
+
     @NotBlank
     @Size(max = 20)
     private String roomNumber;

@@ -102,7 +102,7 @@ export default function ExamCard({ exam, selected = false, onToggle, enrollmentN
                 Time
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
-                {formatTime(exam.examTime)}
+                {formatTime(exam.examTime)}{exam.examEndTime ? ` – ${formatTime(exam.examEndTime)}` : ''}
               </Typography>
             </Box>
           </Box>

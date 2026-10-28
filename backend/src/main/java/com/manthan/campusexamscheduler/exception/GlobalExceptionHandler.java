@@ -1,6 +1,7 @@
 package com.manthan.campusexamscheduler.exception;
 
 import com.manthan.campusexamscheduler.dto.ErrorResponse;
+import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -67,6 +68,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateResource(DuplicateResourceException ex) {
+        return error(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(ImportValidationException.class)
+    public ResponseEntity<ImportPreviewResponse> handleImportValidation(ImportValidationException ex) {
+        return ResponseEntity.unprocessableEntity().body(ex.getPreview());
+    }
+
+    @ExceptionHandler(ScheduleConflictException.class)
+    public ResponseEntity<ErrorResponse> handleScheduleConflict(ScheduleConflictException ex) {
         return error(HttpStatus.CONFLICT, ex.getMessage());
     }
 

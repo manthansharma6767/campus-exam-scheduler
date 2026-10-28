@@ -31,7 +31,7 @@ public class SeatAssignment {
     @Column(name = "room_number", nullable = false, length = 30)
     private String roomNumber;
 
-    @Column(name = "row_number", nullable = false)
+    @Column(name = "`row_number`", nullable = false)
     private Integer rowNumber;
 
     @Column(name = "column_number", nullable = false)

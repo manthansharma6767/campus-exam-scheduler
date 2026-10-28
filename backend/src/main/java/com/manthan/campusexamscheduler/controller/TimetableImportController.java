@@ -1,6 +1,7 @@
 package com.manthan.campusexamscheduler.controller;
 
 import com.manthan.campusexamscheduler.dto.TimetableImportResponse;
+import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
 import com.manthan.campusexamscheduler.service.TimetableImportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -17,6 +18,11 @@ import org.springframework.web.multipart.MultipartFile;
 public class TimetableImportController {
 
     private final TimetableImportService timetableImportService;
+
+    @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ImportPreviewResponse> previewTimetable(@RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(timetableImportService.previewTimetable(file));
+    }
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<TimetableImportResponse> importTimetable(@RequestPart("file") MultipartFile file) {

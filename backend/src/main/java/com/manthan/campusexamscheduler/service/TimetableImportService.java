@@ -1,12 +1,10 @@
 package com.manthan.campusexamscheduler.service;
 
 import com.manthan.campusexamscheduler.dto.ConflictDetail;
-import com.manthan.campusexamscheduler.dto.ImportRowError;
-import com.manthan.campusexamscheduler.dto.TimetableImportResponse;
-import com.manthan.campusexamscheduler.dto.ConflictDetail;
 import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
 import com.manthan.campusexamscheduler.dto.ImportPreviewRow;
 import com.manthan.campusexamscheduler.dto.ImportRowError;
+import com.manthan.campusexamscheduler.dto.TimetableImportResponse;
 import com.manthan.campusexamscheduler.entity.Exam;
 import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.exception.ImportValidationException;
@@ -121,30 +119,16 @@ public class TimetableImportService {
             throw new IllegalArgumentException("The timetable must contain a header row and at least one exam row.");
         }
         Map<String, Integer> columns = headerColumns(rows.get(headerRow));
-<<<<<<< HEAD
-
-        List<Exam> exams = new ArrayList<>();
-=======
         List<ExamCandidate> candidates = new ArrayList<>();
         List<ImportRowError> errors = new ArrayList<>();
->>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
         Set<String> seenInFile = new HashSet<>();
-        List<ImportRowError> rowErrors = new ArrayList<>();
-        List<ConflictDetail> conflicts = new ArrayList<>();
         int skippedDuplicates = 0;
-        int totalDataRows = 0;
-
-        // Track room/time bookings within this import for in-file conflict detection
-        Map<String, Integer> roomTimeInFile = new HashMap<>();
-        // Track subject/date/time bookings per department+semester for student schedule conflicts
-        Map<String, List<String>> deptSemSlotInFile = new HashMap<>();
 
         for (int index = headerRow + 1; index < rows.size(); index++) {
             String[] row = rows.get(index);
             if (Arrays.stream(row).allMatch(value -> value == null || value.isBlank())) continue;
             if (isHeaderRow(row)) continue;
             int rowNumber = index + 1;
-            totalDataRows++;
             try {
                 String subjectCode = normalizeSubjectCode(cell(row, columns, "subjectCode"));
                 String rawDate = cell(row, columns, "date").trim();
@@ -152,38 +136,6 @@ public class TimetableImportService {
                 String rawEndTime = cell(row, columns, "endTime").trim();
                 String building = cell(row, columns, "building").trim();
                 String room = cell(row, columns, "room").trim();
-                if (subjectCode.isBlank() || building.isBlank() || room.isBlank()) {
-                    rowErrors.add(ImportRowError.builder().row(rowNumber)
-                            .message("subject code, building, and room are required").build());
-                    continue;
-                }
-                if (building.length() > 100 || room.length() > 20) {
-                    rowErrors.add(ImportRowError.builder().row(rowNumber)
-                            .message("building must be at most 100 characters and room at most 20").build());
-                    continue;
-                }
-                Subject subject = subjectRepository.findBySubjectCode(subjectCode).orElse(null);
-                if (subject == null) {
-                    rowErrors.add(ImportRowError.builder().row(rowNumber)
-                            .message("no subject matches code " + subjectCode).build());
-                    continue;
-                }
-                LocalDate date;
-                try {
-                    date = parseDate(rawDate);
-                } catch (IllegalArgumentException exception) {
-                    rowErrors.add(ImportRowError.builder().row(rowNumber).message(exception.getMessage()).build());
-                    continue;
-                }
-                LocalTime time;
-                try {
-                    time = parseTime(rawTime);
-                } catch (IllegalArgumentException exception) {
-                    rowErrors.add(ImportRowError.builder().row(rowNumber).message(exception.getMessage()).build());
-                    continue;
-                }
-<<<<<<< HEAD
-=======
                 Subject subject = subjectRepository.findBySubjectCode(subjectCode)
                         .orElseThrow(() -> new IllegalArgumentException("no subject matches code " + subjectCode));
                 LocalDate date = parseDate(rawDate);
@@ -203,55 +155,12 @@ public class TimetableImportService {
                         throw new IllegalArgumentException("exam end time must be later than its start time");
                     }
                 }
->>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
                 String identity = subject.getSubjectId() + "|" + date + "|" + time;
                 if (!seenInFile.add(identity) || examRepository.existsBySubject_SubjectIdAndExamDateAndExamTime(subject.getSubjectId(), date, time)) {
                     skippedDuplicates++;
                     continue;
                 }
-<<<<<<< HEAD
-
-                // Room/time conflict detection
-                boolean notAssigned = "Not assigned".equalsIgnoreCase(building) && "Not assigned".equalsIgnoreCase(room);
-                if (!notAssigned) {
-                    String roomKey = building.toLowerCase(Locale.ROOT) + "|" + room.toLowerCase(Locale.ROOT) + "|" + date + "|" + time;
-                    Integer prevRow = roomTimeInFile.get(roomKey);
-                    if (prevRow != null) {
-                        conflicts.add(ConflictDetail.builder().row(rowNumber).type("ROOM_CONFLICT")
-                                .message("Room " + room + " in " + building + " on " + date + " at " + time + " is also booked in row " + prevRow).build());
-                    } else if (examRepository.existsByBuildingAndRoomNumberAndExamDateAndExamTime(building, room, date, time)) {
-                        conflicts.add(ConflictDetail.builder().row(rowNumber).type("ROOM_CONFLICT")
-                                .message("Room " + room + " in " + building + " on " + date + " at " + time + " is already booked by an existing exam").build());
-                    }
-                    roomTimeInFile.putIfAbsent(roomKey, rowNumber);
-                }
-
-                // Student schedule conflict detection
-                Long deptId = subject.getDepartment().getDepartmentId();
-                Integer sem = subject.getSemester();
-                String deptSemKey = deptId + "|" + sem + "|" + date + "|" + time;
-                List<String> existingSubjects = deptSemSlotInFile.computeIfAbsent(deptSemKey, k -> new ArrayList<>());
-                if (!existingSubjects.isEmpty()) {
-                    conflicts.add(ConflictDetail.builder().row(rowNumber).type("STUDENT_SCHEDULE_CONFLICT")
-                            .message("Students in " + subject.getDepartment().getDepartmentName() + " sem " + sem
-                                    + " already have " + String.join(", ", existingSubjects) + " at " + date + " " + time).build());
-                } else {
-                    List<Exam> existingConflicts = examRepository.findConflictingStudentExams(date, time, deptId, sem);
-                    if (!existingConflicts.isEmpty()) {
-                        String existing = existingConflicts.stream()
-                                .map(e -> e.getSubject().getSubjectCode())
-                                .reduce((a, b) -> a + ", " + b).orElse("");
-                        conflicts.add(ConflictDetail.builder().row(rowNumber).type("STUDENT_SCHEDULE_CONFLICT")
-                                .message("Students in " + subject.getDepartment().getDepartmentName() + " sem " + sem
-                                        + " already have " + existing + " at " + date + " " + time).build());
-                    }
-                }
-                existingSubjects.add(subjectCode);
-
-                exams.add(Exam.builder()
-=======
                 Exam exam = Exam.builder()
->>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
                         .subject(subject)
                         .examDate(date)
                         .examTime(time)
@@ -261,44 +170,6 @@ public class TimetableImportService {
                         .build();
                 candidates.add(new ExamCandidate(rowNumber, exam));
             } catch (IllegalArgumentException exception) {
-<<<<<<< HEAD
-                rowErrors.add(ImportRowError.builder().row(rowNumber).message(exception.getMessage()).build());
-            }
-        }
-
-        // If there are validation errors, reject the entire batch (no partial save)
-        if (!rowErrors.isEmpty()) {
-            String summary = rowErrors.size() + " row(s) have validation errors. No records were saved.";
-            return TimetableImportResponse.builder()
-                    .imported(0)
-                    .skippedDuplicates(skippedDuplicates)
-                    .totalRows(totalDataRows)
-                    .message(summary)
-                    .rowErrors(rowErrors)
-                    .conflicts(conflicts)
-                    .build();
-        }
-
-        if (exams.isEmpty() && skippedDuplicates == 0) {
-            throw new IllegalArgumentException("No exam rows were found in the timetable.");
-        }
-        examRepository.saveAll(exams);
-
-        String message = "Imported " + exams.size() + " exam(s); skipped " + skippedDuplicates + " duplicate(s).";
-        if (!conflicts.isEmpty()) {
-            message += " " + conflicts.size() + " conflict warning(s) detected.";
-        }
-        return TimetableImportResponse.builder()
-                .imported(exams.size())
-                .skippedDuplicates(skippedDuplicates)
-                .totalRows(totalDataRows)
-                .message(message)
-                .rowErrors(List.of())
-                .conflicts(conflicts)
-                .build();
-    }
-
-=======
                 errors.add(new ImportRowError(rowNumber, exception.getMessage()));
             }
         }
@@ -362,7 +233,6 @@ public class TimetableImportService {
             List<ImportRowError> errors,
             List<ConflictDetail> conflicts,
             List<ImportPreviewRow> previewRows) { }
->>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
 
     private List<String[]> readSpreadsheet(MultipartFile file) throws IOException {
         List<String[]> rows = new ArrayList<>();

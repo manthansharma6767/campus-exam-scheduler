@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -33,17 +32,6 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationProvider authenticationProvider() {
-
-        DaoAuthenticationProvider provider =
-                new DaoAuthenticationProvider(customUserDetailsService);
-
-        provider.setPasswordEncoder(passwordEncoder());
-
-        return provider;
-    }
-
-    @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration configuration) throws Exception {
 
@@ -53,6 +41,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
             throws Exception {
+
+        DaoAuthenticationProvider authenticationProvider =
+                new DaoAuthenticationProvider(customUserDetailsService);
+        authenticationProvider.setPasswordEncoder(passwordEncoder());
 
         http
                 .cors(Customizer.withDefaults())
@@ -91,7 +83,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                .authenticationProvider(authenticationProvider())
+                .authenticationProvider(authenticationProvider)
 
                 .addFilterBefore(
                         jwtAuthenticationFilter,

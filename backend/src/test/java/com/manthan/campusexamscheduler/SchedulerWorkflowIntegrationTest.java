@@ -5,6 +5,7 @@ import com.manthan.campusexamscheduler.dto.AuthenticationRequest;
 import com.manthan.campusexamscheduler.dto.DepartmentRequest;
 import com.manthan.campusexamscheduler.dto.ExamRequest;
 import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
+import com.manthan.campusexamscheduler.dto.ImportRowError;
 import com.manthan.campusexamscheduler.dto.StudentRequest;
 import com.manthan.campusexamscheduler.dto.SubjectRequest;
 import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
@@ -436,12 +437,22 @@ class SchedulerWorkflowIntegrationTest {
         MockMultipartFile invalidFile = new MockMultipartFile(
                 "file", "invalid-students.csv", "text/csv",
                 invalidRows.getBytes(StandardCharsets.UTF_8));
+<<<<<<< HEAD
         ImportValidationException error = assertThrows(
                 ImportValidationException.class,
                 () -> studentImportService.importStudents(invalidFile));
         assertEquals(1, error.getPreview().errors().size());
         assertEquals(3, error.getPreview().errors().get(0).rowNumber());
         assertTrue(error.getPreview().errors().get(0).message().contains("semester"));
+=======
+        ImportValidationException validationError = assertThrows(
+                ImportValidationException.class,
+                () -> studentImportService.importStudents(invalidFile));
+        assertEquals(1, validationError.getPreview().errors().size());
+        ImportRowError rowError = validationError.getPreview().errors().get(0);
+        assertEquals(3, rowError.rowNumber());
+        assertTrue(rowError.message().contains("semester"));
+>>>>>>> c854579 (Added Add all and Clear Feature)
         assertTrue(studentService.getAllStudents().stream()
                 .noneMatch(student -> "RB-IMPORT-002".equals(student.getEnrollmentNumber())));
     }

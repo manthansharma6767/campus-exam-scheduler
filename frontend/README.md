@@ -6,7 +6,11 @@ React 19 single-page application built with Vite and Material UI.
 
 1. Install Node.js and npm.
 2. From this directory, run `npm install`.
+<<<<<<< HEAD
 3. Start the backend using the instructions in the repository-root README. The Spring Boot project is in `../backend/`.
+=======
+3. Start the backend using the instructions in the [project README](../README.md).
+>>>>>>> 156a3a3 (Update README documentation)
 4. Run `npm run dev` and open the local URL printed by Vite.
 
 The API defaults to `http://localhost:8080`. To point the frontend at another backend, create a `.env.local` file in this directory with:

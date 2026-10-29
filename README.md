@@ -39,9 +39,15 @@ A full-stack application for managing college examination schedules. Administrat
 
 ```text
 .
+<<<<<<< HEAD
 ├── backend/             # Spring Boot application, tests, Maven wrapper, and Dockerfile
 ├── frontend/            # React/Vite web application
 ├── database/             # Database scripts and seed data
+=======
+├── backend/             # Spring Boot application, tests, and Maven wrapper
+├── database/            # SQL seed scripts
+├── frontend/            # React/Vite web application
+>>>>>>> 156a3a3 (Update README documentation)
 ├── postman/             # Postman workspace configuration
 └── README.md
 ```

@@ -114,7 +114,7 @@ export default function SeatingLookup() {
                         value={planId}
                         onChange={(event) => { setPlanId(event.target.value); setSeat(null); setError(''); }}
                         sx={{ mb: 2.5 }}
-                        inputProps={{ 'aria-label': 'Choose a seating plan' }}
+                        slotProps={{ select: { inputProps: { 'aria-label': 'Choose a seating plan' } } }}
                       >
                         {plans.map((plan) => (
                           <MenuItem key={plan.seatingPlanId} value={String(plan.seatingPlanId)}>
@@ -129,7 +129,7 @@ export default function SeatingLookup() {
                           placeholder="For example, A1-16"
                           value={rollNumber}
                           onChange={(event) => { setRollNumber(event.target.value); setError(''); }}
-                          inputProps={{ 'aria-label': 'Roll number', maxLength: 20, style: { textTransform: 'uppercase' } }}
+                          slotProps={{ htmlInput: { 'aria-label': 'Roll number', maxLength: 20, style: { textTransform: 'uppercase' } } }}
                           autoComplete="off"
                         />
                         <Button

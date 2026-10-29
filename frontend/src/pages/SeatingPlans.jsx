@@ -127,7 +127,7 @@ export default function SeatingPlans() {
                   placeholder="Uses the session title from the PDF"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  inputProps={{ maxLength: 200 }}
+                  slotProps={{ htmlInput: { maxLength: 200 } }}
                   fullWidth
                 />
                 <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />} sx={{ py: 1.5, justifyContent: 'flex-start', overflow: 'hidden' }}>

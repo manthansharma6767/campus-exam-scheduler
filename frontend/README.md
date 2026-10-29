@@ -6,7 +6,11 @@ React 19 single-page application built with Vite and Material UI.
 
 1. Install Node.js and npm.
 2. From this directory, run `npm install`.
+<<<<<<< HEAD
+3. Start the backend using the instructions in the repository-root README. The Spring Boot project is in `../backend/`.
+=======
 3. Start the backend using the instructions in the [project README](../README.md).
+>>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
 4. Run `npm run dev` and open the local URL printed by Vite.
 
 The API defaults to `http://localhost:8080`. To point the frontend at another backend, create a `.env.local` file in this directory with:
@@ -24,7 +28,7 @@ Do not include database credentials or server secrets in `VITE_*` variables; tho
 - Admin login, first-admin setup, dashboard, and department, subject, student, and exam management.
 - Admin timetable import for `.xls`, `.xlsx`, and text-based `.pdf` files.
 
-For timetable column requirements, data setup order, and backend configuration, see the backend README.
+For timetable column requirements, data setup order, and backend configuration, see the repository-root README.
 
 ## Commands
 

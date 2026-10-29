@@ -39,11 +39,18 @@ A full-stack application for managing college examination schedules. Administrat
 
 ```text
 .
+<<<<<<< HEAD
+├── backend/             # Spring Boot backend and tests
+├── frontend/            # React/Vite web application
+├── postman/             # Postman workspace configuration
+└── .postman/
+=======
 ├── backend/             # Spring Boot application, tests, and Maven wrapper
 ├── frontend/            # React/Vite web application
 ├── postman/             # Postman workspace configuration
 ├── Dockerfile           # Builds the backend image
 └── README.md
+>>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
 ```
 
 ## Getting started
@@ -69,9 +76,10 @@ CREATE DATABASE campus_exam_scheduler;
 
 ### 2. Configure and start the backend
 
-Set these environment variables in your IDE run configuration or terminal. The example below is for PowerShell; replace the local database username and password with your own values.
+From the repository root, use these commands to configure and start the backend from `backend/`. In an IDE, set the same variables in the backend run configuration. The example below is for PowerShell; replace the local database username and password with your own values. The backend has no embedded database credentials or JWT signing-key fallback.
 
 ```powershell
+cd backend
 $env:SPRING_DATASOURCE_URL = "jdbc:mysql://localhost:3306/campus_exam_scheduler?serverTimezone=UTC"
 $env:SPRING_DATASOURCE_USERNAME = "root"
 $env:SPRING_DATASOURCE_PASSWORD = "<your-local-mysql-password>"
@@ -86,7 +94,7 @@ The backend runs at `http://localhost:8080` by default. Keep the database creden
 
 ### 3. Start the frontend
 
-In a second terminal, from the repository root:
+In a second terminal, from `frontend/`:
 
 ```bash
 cd frontend
@@ -147,3 +155,5 @@ npm run build
 ```
 
 When the backend is running, the API reference is available at `http://localhost:8080/swagger-ui/index.html`.
+
+The backend Dockerfile is in `backend/`; build it with `docker build -f backend/Dockerfile backend`.

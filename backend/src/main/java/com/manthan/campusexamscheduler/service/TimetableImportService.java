@@ -1,10 +1,10 @@
 package com.manthan.campusexamscheduler.service;
 
-import com.manthan.campusexamscheduler.dto.TimetableImportResponse;
 import com.manthan.campusexamscheduler.dto.ConflictDetail;
 import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
 import com.manthan.campusexamscheduler.dto.ImportPreviewRow;
 import com.manthan.campusexamscheduler.dto.ImportRowError;
+import com.manthan.campusexamscheduler.dto.TimetableImportResponse;
 import com.manthan.campusexamscheduler.entity.Exam;
 import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.exception.ImportValidationException;
@@ -136,12 +136,6 @@ public class TimetableImportService {
                 String rawEndTime = cell(row, columns, "endTime").trim();
                 String building = cell(row, columns, "building").trim();
                 String room = cell(row, columns, "room").trim();
-                if (subjectCode.isBlank() || building.isBlank() || room.isBlank()) {
-                    throw new IllegalArgumentException("subject code, building, and room are required");
-                }
-                if (building.length() > 100 || room.length() > 20) {
-                    throw new IllegalArgumentException("building must be at most 100 characters and room at most 20");
-                }
                 Subject subject = subjectRepository.findBySubjectCode(subjectCode)
                         .orElseThrow(() -> new IllegalArgumentException("no subject matches code " + subjectCode));
                 LocalDate date = parseDate(rawDate);

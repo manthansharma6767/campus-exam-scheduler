@@ -61,5 +61,26 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
     boolean existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamIdNot(
             Long subjectId, LocalDate examDate, LocalTime examTime, Long examId);
 
+    boolean existsByBuildingAndRoomNumberAndExamDateAndExamTime(
+            String building, String roomNumber, LocalDate examDate, LocalTime examTime);
 
+    boolean existsByBuildingAndRoomNumberAndExamDateAndExamTimeAndExamIdNot(
+            String building, String roomNumber, LocalDate examDate, LocalTime examTime, Long examId);
+
+    @Query("""
+            SELECT e
+            FROM Exam e
+            JOIN FETCH e.subject s
+            JOIN FETCH s.department d
+            WHERE e.examDate = :examDate
+              AND e.examTime = :examTime
+              AND s.department.departmentId = :departmentId
+              AND s.semester = :semester
+            """)
+    List<Exam> findConflictingStudentExams(
+            @Param("examDate") LocalDate examDate,
+            @Param("examTime") LocalTime examTime,
+            @Param("departmentId") Long departmentId,
+            @Param("semester") Integer semester);
 }
+

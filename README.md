@@ -39,18 +39,11 @@ A full-stack application for managing college examination schedules. Administrat
 
 ```text
 .
-<<<<<<< HEAD
-├── backend/             # Spring Boot backend and tests
+├── backend/             # Spring Boot application, tests, Maven wrapper, and Dockerfile
 ├── frontend/            # React/Vite web application
+├── database/             # Database scripts and seed data
 ├── postman/             # Postman workspace configuration
-└── .postman/
-=======
-├── backend/             # Spring Boot application, tests, and Maven wrapper
-├── frontend/            # React/Vite web application
-├── postman/             # Postman workspace configuration
-├── Dockerfile           # Builds the backend image
 └── README.md
->>>>>>> 2f4335a172fae9329362d4f32284c1e6aaa1cad0
 ```
 
 ## Getting started
@@ -86,7 +79,6 @@ $env:SPRING_DATASOURCE_PASSWORD = "<your-local-mysql-password>"
 $env:JWT_SECRET = "<a-random-secret-at-least-32-characters-long>"
 $env:ADMIN_SETUP_TOKEN = "<a-long-random-one-time-setup-token>"
 $env:CORS_ALLOWED_ORIGINS = "http://localhost:5173"
-Set-Location backend
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -156,4 +148,4 @@ npm run build
 
 When the backend is running, the API reference is available at `http://localhost:8080/swagger-ui/index.html`.
 
-The backend Dockerfile is in `backend/`; build it with `docker build -f backend/Dockerfile backend`.
+The backend Dockerfile is in `backend/`; from the repository root, build it with `docker build -f backend/Dockerfile .`.

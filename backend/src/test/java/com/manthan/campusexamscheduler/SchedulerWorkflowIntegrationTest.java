@@ -15,7 +15,6 @@ import com.manthan.campusexamscheduler.service.DepartmentService;
 import com.manthan.campusexamscheduler.service.ExamService;
 import com.manthan.campusexamscheduler.service.StudentImportService;
 import com.manthan.campusexamscheduler.service.StudentService;
-import com.manthan.campusexamscheduler.service.StudentImportService;
 import com.manthan.campusexamscheduler.service.SubjectService;
 import com.manthan.campusexamscheduler.service.SeatingPlanService;
 import com.manthan.campusexamscheduler.service.TimetableImportService;
@@ -53,7 +52,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -211,6 +209,40 @@ class SchedulerWorkflowIntegrationTest {
                 .building("Other Hall")
                 .subjectId(firstSubject.getSubjectId())
                 .build()));
+    }
+
+    @Test
+    void timetableImportPreviewRejectsMissingOrOversizedRoomDetailsBeforeSaving() throws Exception {
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName("Timetable Field Validation Department").build());
+        subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode("VAL101")
+                .subjectName("Validation Test")
+                .semester(4)
+                .departmentId(department.getDepartmentId())
+                .build());
+        long examsBefore = examService.getAllExams().size();
+        String oversizedBuilding = "B".repeat(101);
+        String oversizedRoom = "R".repeat(21);
+        MockMultipartFile timetable = new MockMultipartFile("file", "invalid-rooms.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                spreadsheetBytes(new String[][] {
+                        {"VAL101", "2098-12-31", "09:00", "", "101"},
+                        {"VAL101", "2098-12-31", "10:00", "Main Building", ""},
+                        {"VAL101", "2098-12-31", "11:00", oversizedBuilding, "102"},
+                        {"VAL101", "2098-12-31", "12:00", "Main Building", oversizedRoom}
+                }));
+
+        ImportPreviewResponse preview = timetableImportService.previewTimetable(timetable);
+
+        assertEquals(0, preview.validRows());
+        assertEquals(4, preview.errors().size());
+        assertTrue(preview.errors().toString().contains("building"));
+        assertTrue(preview.errors().toString().contains("room"));
+        assertFalse(preview.canImport());
+        assertThrows(ImportValidationException.class,
+                () -> timetableImportService.importTimetable(timetable));
+        assertEquals(examsBefore, examService.getAllExams().size());
     }
 
     @Test
@@ -404,11 +436,12 @@ class SchedulerWorkflowIntegrationTest {
         MockMultipartFile invalidFile = new MockMultipartFile(
                 "file", "invalid-students.csv", "text/csv",
                 invalidRows.getBytes(StandardCharsets.UTF_8));
-        IllegalArgumentException error = assertThrows(
-                IllegalArgumentException.class,
+        ImportValidationException error = assertThrows(
+                ImportValidationException.class,
                 () -> studentImportService.importStudents(invalidFile));
-        assertTrue(error.getMessage().contains("Row 3"));
-        assertTrue(error.getMessage().contains("semester"));
+        assertEquals(1, error.getPreview().errors().size());
+        assertEquals(3, error.getPreview().errors().get(0).rowNumber());
+        assertTrue(error.getPreview().errors().get(0).message().contains("semester"));
         assertTrue(studentService.getAllStudents().stream()
                 .noneMatch(student -> "RB-IMPORT-002".equals(student.getEnrollmentNumber())));
     }

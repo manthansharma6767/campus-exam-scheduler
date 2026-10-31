@@ -32,6 +32,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
@@ -56,17 +58,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:scheduler_workflow_test;MODE=MySQL;DB_CLOSE_DELAY=-1",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "ADMIN_SETUP_TOKEN=workflow-test-setup-token",
-        "JWT_SECRET=integration-test-jwt-secret-with-at-least-32-characters"
-})
+@SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SchedulerWorkflowIntegrationTest {
+    @DynamicPropertySource
+    static void configureMySqlTestDatabase(DynamicPropertyRegistry registry) {
+        MySqlTestProperties.register(registry);
+    }
 
     private MockMvc mockMvc;
 
@@ -437,14 +435,6 @@ class SchedulerWorkflowIntegrationTest {
         MockMultipartFile invalidFile = new MockMultipartFile(
                 "file", "invalid-students.csv", "text/csv",
                 invalidRows.getBytes(StandardCharsets.UTF_8));
-<<<<<<< HEAD
-        ImportValidationException error = assertThrows(
-                ImportValidationException.class,
-                () -> studentImportService.importStudents(invalidFile));
-        assertEquals(1, error.getPreview().errors().size());
-        assertEquals(3, error.getPreview().errors().get(0).rowNumber());
-        assertTrue(error.getPreview().errors().get(0).message().contains("semester"));
-=======
         ImportValidationException validationError = assertThrows(
                 ImportValidationException.class,
                 () -> studentImportService.importStudents(invalidFile));
@@ -452,7 +442,6 @@ class SchedulerWorkflowIntegrationTest {
         ImportRowError rowError = validationError.getPreview().errors().get(0);
         assertEquals(3, rowError.rowNumber());
         assertTrue(rowError.message().contains("semester"));
->>>>>>> c854579 (Added Add all and Clear Feature)
         assertTrue(studentService.getAllStudents().stream()
                 .noneMatch(student -> "RB-IMPORT-002".equals(student.getEnrollmentNumber())));
     }

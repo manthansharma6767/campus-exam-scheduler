@@ -102,12 +102,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Isolated in-memory database for tests; no local MySQL is required. -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
-        </dependency>
 
         <!-- Spring Security Testing -->
         <dependency>

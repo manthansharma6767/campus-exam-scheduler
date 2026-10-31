@@ -3,17 +3,16 @@ package com.manthan.campusexamscheduler;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
-@SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:campus_exam_scheduler_test;MODE=MySQL",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "JWT_SECRET=context-test-jwt-secret-with-at-least-32-characters"
-})
+@SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CampusExamSchedulerApplicationTests {
+    @DynamicPropertySource
+    static void configureMySqlTestDatabase(DynamicPropertyRegistry registry) {
+        MySqlTestProperties.register(registry);
+    }
 
     @Test
     void contextLoads() {

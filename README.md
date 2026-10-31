@@ -145,6 +145,17 @@ Students can search by enrollment number or browse published exams without loggi
 
 ## Development commands
 
+### MySQL integration-test database
+
+Spring integration tests use the existing `campus_exam_scheduler` database. The tests use `ddl-auto=create-drop` after validating that the JDBC URL points exactly to this database, so its tables are recreated and dropped when the test context closes. Do not run these tests against a database containing data you need to preserve.
+
+Set these variables in the test process or IDE run configuration. The root .env.example contains placeholders; Spring does not automatically load a root .env file.
+
+```powershell
+$env:TEST_DATASOURCE_URL = "jdbc:mysql://localhost:3306/campus_exam_scheduler?serverTimezone=UTC"
+$env:TEST_DATASOURCE_USERNAME = "<your-mysql-username>"
+$env:TEST_DATASOURCE_PASSWORD = "<your-mysql-password>"
+```
 Run backend tests:
 
 ```powershell
@@ -173,7 +184,7 @@ docker build -f backend/Dockerfile backend
 ## Security and data handling
 
 - Never commit passwords, tokens, database URLs containing credentials, or `.env` files.
-- Use a disposable MySQL schema for development and testing.
+- Use a database whose data can be recreated before running integration tests.
 - The application uses `ddl-auto=update`; review database permissions and backups before connecting it to an existing schema.
 - Do not use the demo SQL script against production data.
 

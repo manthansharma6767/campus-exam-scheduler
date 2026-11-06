@@ -10,14 +10,14 @@ class MySqlTestPropertiesTest {
     @Test
     void acceptsOnlyTheConfiguredMySqlDatabase() {
         assertDoesNotThrow(() -> MySqlTestProperties.requireDedicatedTestSchema(
-                "jdbc:mysql://localhost:3306/campus_exam_scheduler?serverTimezone=UTC"));
+                "jdbc:mysql://localhost:3306/campus_exam_scheduler_test?serverTimezone=UTC"));
     }
 
     @Test
     void rejectsAnotherDatabase() {
         assertThrows(IllegalStateException.class, () ->
                 MySqlTestProperties.requireDedicatedTestSchema(
-                        "jdbc:mysql://localhost:3306/campus_exam_scheduler_test?serverTimezone=UTC"));
+                        "jdbc:mysql://localhost:3306/campus_exam_scheduler?serverTimezone=UTC"));
     }
 
     @Test

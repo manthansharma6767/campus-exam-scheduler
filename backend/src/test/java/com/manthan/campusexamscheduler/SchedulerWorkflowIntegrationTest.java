@@ -34,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
@@ -182,7 +183,7 @@ class SchedulerWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.errors.length()").value(1))
                 .andExpect(jsonPath("$.conflicts.length()").value(2));
         mockMvc.perform(multipart("/api/exams/import").file(timetable).with(user("test-admin")))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().is(HttpStatus.UNPROCESSABLE_CONTENT.value()))
                 .andExpect(jsonPath("$.canImport").value(false));
         assertThrows(ImportValidationException.class,
                 () -> timetableImportService.importTimetable(timetable));
@@ -444,6 +445,54 @@ class SchedulerWorkflowIntegrationTest {
         assertTrue(rowError.message().contains("semester"));
         assertTrue(studentService.getAllStudents().stream()
                 .noneMatch(student -> "RB-IMPORT-002".equals(student.getEnrollmentNumber())));
+    }
+
+    @Test
+    void importsStudentXlsxRosterAndSkipsRepeatedRollNumbers() throws Exception {
+        String departmentName = "Student Excel Import Test Department";
+        departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName(departmentName).build());
+
+        byte[] workbookBytes;
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("Students");
+            Row header = sheet.createRow(0);
+            String[] headers = {"Name", "Email", "Password", "Roll Number", "Semester", "Department"};
+            for (int column = 0; column < headers.length; column++) {
+                header.createCell(column).setCellValue(headers[column]);
+            }
+            Row student = sheet.createRow(1);
+            student.createCell(0).setCellValue("Excel Import Student");
+            student.createCell(1).setCellValue("excel.import@example.com");
+            student.createCell(2).setCellValue("ExcelImportPass123");
+            student.createCell(3).setCellValue("RB-EXCEL-001");
+            student.createCell(4).setCellValue(6);
+            student.createCell(5).setCellValue(departmentName);
+            workbook.write(output);
+            workbookBytes = output.toByteArray();
+        }
+
+        MockMultipartFile studentFile = new MockMultipartFile(
+                "file", "students.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                workbookBytes);
+
+        ImportPreviewResponse preview = studentImportService.previewStudents(studentFile);
+        assertTrue(preview.canImport());
+        assertEquals(1, preview.validRows());
+        assertFalse(preview.rows().toString().contains("ExcelImportPass123"));
+
+        var imported = studentImportService.importStudents(studentFile);
+        assertEquals(1, imported.getImported());
+        assertEquals(0, imported.getSkippedDuplicates());
+        assertTrue(studentService.getAllStudents().stream()
+                .anyMatch(savedStudent -> "RB-EXCEL-001".equals(savedStudent.getEnrollmentNumber())
+                        && "Excel Import Student".equals(savedStudent.getName())));
+
+        var repeatedImport = studentImportService.importStudents(studentFile);
+        assertEquals(0, repeatedImport.getImported());
+        assertEquals(1, repeatedImport.getSkippedDuplicates());
     }
 
     @Test

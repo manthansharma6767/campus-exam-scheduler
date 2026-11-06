@@ -44,7 +44,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
-        return error(HttpStatus.PAYLOAD_TOO_LARGE, "The uploaded file exceeds the 10 MB limit.");
+        return error(HttpStatus.CONTENT_TOO_LARGE, "The uploaded file exceeds the 10 MB limit.");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -73,7 +73,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ImportValidationException.class)
     public ResponseEntity<ImportPreviewResponse> handleImportValidation(ImportValidationException ex) {
-        return ResponseEntity.unprocessableEntity().body(ex.getPreview());
+        return ResponseEntity.unprocessableContent().body(ex.getPreview());
     }
 
     @ExceptionHandler(ScheduleConflictException.class)

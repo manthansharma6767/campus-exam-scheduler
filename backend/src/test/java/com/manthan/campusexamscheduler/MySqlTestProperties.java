@@ -10,9 +10,9 @@ import org.springframework.test.context.DynamicPropertyRegistry;
  */
 final class MySqlTestProperties {
 
-    private static final String TEST_SCHEMA = "campus_exam_scheduler";
+    private static final String TEST_SCHEMA = "campus_exam_scheduler_test";
     private static final String DEFAULT_URL =
-            "jdbc:mysql://localhost:3306/campus_exam_scheduler?serverTimezone=UTC";
+            "jdbc:mysql://localhost:3306/campus_exam_scheduler_test?serverTimezone=UTC";
 
     private MySqlTestProperties() {
     }

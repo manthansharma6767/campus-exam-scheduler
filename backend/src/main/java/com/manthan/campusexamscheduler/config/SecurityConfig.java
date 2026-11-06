@@ -1,6 +1,5 @@
 package com.manthan.campusexamscheduler.config;
 
-import com.manthan.campusexamscheduler.security.CustomUserDetailsService;
 import com.manthan.campusexamscheduler.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -8,7 +7,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -23,7 +21,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final CustomUserDetailsService customUserDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
@@ -41,10 +38,6 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
             throws Exception {
-
-        DaoAuthenticationProvider authenticationProvider =
-                new DaoAuthenticationProvider(customUserDetailsService);
-        authenticationProvider.setPasswordEncoder(passwordEncoder());
 
         http
                 .cors(Customizer.withDefaults())
@@ -82,8 +75,6 @@ public class SecurityConfig {
                         // Everything else requires login
                         .anyRequest().authenticated()
                 )
-
-                .authenticationProvider(authenticationProvider)
 
                 .addFilterBefore(
                         jwtAuthenticationFilter,

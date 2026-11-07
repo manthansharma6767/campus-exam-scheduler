@@ -11,6 +11,8 @@ import com.manthan.campusexamscheduler.dto.SubjectRequest;
 import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.exception.ImportValidationException;
 import com.manthan.campusexamscheduler.exception.ScheduleConflictException;
+import com.manthan.campusexamscheduler.repository.AdministratorRepository;
+import com.manthan.campusexamscheduler.service.AdministratorService;
 import com.manthan.campusexamscheduler.service.AuthenticationService;
 import com.manthan.campusexamscheduler.service.DepartmentService;
 import com.manthan.campusexamscheduler.service.ExamService;
@@ -41,12 +43,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -61,10 +66,46 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@Transactional
 class SchedulerWorkflowIntegrationTest {
+    private static final String RUN_ID = UUID.randomUUID().toString()
+            .replace("-", "").substring(0, 8).toUpperCase(Locale.ROOT);
+    private static final String RUN_SUFFIX = RUN_ID.toLowerCase(Locale.ROOT);
+    private static final String ADMIN_EMAIL = "admin." + RUN_SUFFIX + "@example.test";
+    private static final String STUDENT_EMAIL = "student." + RUN_SUFFIX + "@example.test";
+    private static final String PREVIEW_EMAIL = "valid.preview." + RUN_SUFFIX + "@example.test";
+    private static final String BULK_EMAIL = "bulk.one." + RUN_SUFFIX + "@example.test";
+    private static final String EXCEL_EMAIL = "excel.import." + RUN_SUFFIX + "@example.test";
+    private static final String DELETE_EMAIL = "delete.workflow." + RUN_SUFFIX + "@example.test";
+    private static final String STUDENT_ROLL = "RB-" + RUN_ID + "-01";
+    private static final String PREVIEW_ROLL = "RB-" + RUN_ID + "-P1";
+    private static final String INVALID_PREVIEW_ROLL = "RB-" + RUN_ID + "-P2";
+    private static final String BULK_ROLL = "RB-" + RUN_ID + "-I1";
+    private static final String NOT_SAVED_ROLL = "RB-" + RUN_ID + "-I2";
+    private static final String INVALID_SEMESTER_ROLL = "RB-" + RUN_ID + "-I3";
+    private static final String EXCEL_ROLL = "RB-" + RUN_ID + "-X1";
+    private static final String DELETE_ROLL = "RB-" + RUN_ID + "-D1";
+    private static final String CS_CODE = testCode("CS1");
+    private static final String CF1_CODE = testCode("CF1");
+    private static final String CF2_CODE = testCode("CF2");
+    private static final String VAL_CODE = testCode("VAL");
+    private static final String DEL_CODE = testCode("DEL");
+    private static final String MATRIX_CODE_1 = RUN_ID + "TH0501";
+    private static final String MATRIX_CODE_2 = RUN_ID + "TH0502";
+    private static final String SEATING_TITLE = "Sessional Test 1 " + RUN_ID;
+    private static final String SEATING_DEPARTMENT = "Department of Computer Science " + RUN_ID;
+
     @DynamicPropertySource
     static void configureMySqlTestDatabase(DynamicPropertyRegistry registry) {
         MySqlTestProperties.register(registry);
+    }
+
+    private static String testName(String base) {
+        return base + " " + RUN_ID;
+    }
+
+    private static String testCode(String suffix) {
+        return "T" + RUN_ID + suffix;
     }
 
     private MockMvc mockMvc;
@@ -74,6 +115,12 @@ class SchedulerWorkflowIntegrationTest {
 
     @Autowired
     private AuthenticationService authenticationService;
+
+    @Autowired
+    private AdministratorService administratorService;
+
+    @Autowired
+    private AdministratorRepository administratorRepository;
 
     @Autowired
     private DepartmentService departmentService;
@@ -115,12 +162,13 @@ class SchedulerWorkflowIntegrationTest {
     @Test
     void studentImportPreviewReportsAllErrorsWithoutSavingOrExposingPasswords() throws Exception {
         var department = departmentService.createDepartment(
-                DepartmentRequest.builder().departmentName("Bulk Preview Department").build());
+                DepartmentRequest.builder().departmentName(testName("Bulk Preview Department")).build());
         MockMultipartFile invalidRoster = csvFile("students.csv", """
                 Name,Email,Password,Roll Number,Semester,Department
-                Valid Student,valid.preview@example.com,SecretPass123,RBPREVIEW1,5,%s
-                Invalid Student,not-an-email,short,RBPREVIEW2,5,%s
-                """.formatted(department.getDepartmentName(), department.getDepartmentName()));
+                Valid Student,%s,SecretPass123,%s,5,%s
+                Invalid Student,not-an-email,short,%s,5,%s
+                """.formatted(PREVIEW_EMAIL, PREVIEW_ROLL, department.getDepartmentName(),
+                INVALID_PREVIEW_ROLL, department.getDepartmentName()));
 
         ImportPreviewResponse preview = studentImportService.previewStudents(invalidRoster);
 
@@ -129,16 +177,16 @@ class SchedulerWorkflowIntegrationTest {
         assertFalse(preview.canImport());
         assertFalse(preview.rows().toString().contains("SecretPass123"));
         assertFalse(studentService.getAllStudents().stream()
-                .anyMatch(student -> student.getEmail().equals("valid.preview@example.com")));
+                .anyMatch(student -> student.getEmail().equals(PREVIEW_EMAIL)));
         assertThrows(ImportValidationException.class,
                 () -> studentImportService.importStudents(invalidRoster));
         assertFalse(studentService.getAllStudents().stream()
-                .anyMatch(student -> student.getEmail().equals("valid.preview@example.com")));
+                .anyMatch(student -> student.getEmail().equals(PREVIEW_EMAIL)));
 
         MockMultipartFile validRoster = csvFile("students.csv", """
                 Name,Email,Password,Roll Number,Semester,Department
-                Valid Student,valid.preview@example.com,SecretPass123,RBPREVIEW1,5,%s
-                """.formatted(department.getDepartmentName()));
+                Valid Student,%s,SecretPass123,%s,5,%s
+                """.formatted(PREVIEW_EMAIL, PREVIEW_ROLL, department.getDepartmentName()));
         mockMvc.perform(multipart("/api/students/import/preview").file(validRoster).with(user("test-admin")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.canImport").value(true))
@@ -147,25 +195,25 @@ class SchedulerWorkflowIntegrationTest {
         assertTrue(validPreview.canImport());
         assertEquals(1, studentImportService.importStudents(validRoster).getImported());
         assertTrue(studentService.getAllStudents().stream()
-                .anyMatch(student -> student.getEmail().equals("valid.preview@example.com")));
+                .anyMatch(student -> student.getEmail().equals(PREVIEW_EMAIL)));
     }
 
     @Test
     void timetablePreviewCollectsRowErrorsAndScheduleConflictsWithoutSaving() throws Exception {
         var department = departmentService.createDepartment(
-                DepartmentRequest.builder().departmentName("Schedule Conflict Department").build());
+                DepartmentRequest.builder().departmentName(testName("Schedule Conflict Department")).build());
         var firstSubject = subjectService.createSubject(SubjectRequest.builder()
-                .subjectCode("CF101").subjectName("Conflict One").semester(3)
+                .subjectCode(CF1_CODE).subjectName("Conflict One").semester(3)
                 .departmentId(department.getDepartmentId()).build());
         var secondSubject = subjectService.createSubject(SubjectRequest.builder()
-                .subjectCode("CF102").subjectName("Conflict Two").semester(3)
+                .subjectCode(CF2_CODE).subjectName("Conflict Two").semester(3)
                 .departmentId(department.getDepartmentId()).build());
         long examsBefore = examService.getAllExams().size();
         MockMultipartFile timetable = new MockMultipartFile("file", "conflicts.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 spreadsheetBytes(new String[][] {
-                        {"CF101", "2098-12-31", "09:00-11:00", "Conflict Hall", "101"},
-                        {"CF102", "2098-12-31", "10:30-12:00", "Conflict Hall", "101"},
+                        {CF1_CODE, "2098-12-31", "09:00-11:00", "Conflict Hall", "101"},
+                        {CF2_CODE, "2098-12-31", "10:30-12:00", "Conflict Hall", "101"},
                         {"UNKNOWN", "not-a-date", "09:00", "Other Hall", "202"}
                 }));
 
@@ -214,9 +262,9 @@ class SchedulerWorkflowIntegrationTest {
     @Test
     void timetableImportPreviewRejectsMissingOrOversizedRoomDetailsBeforeSaving() throws Exception {
         var department = departmentService.createDepartment(
-                DepartmentRequest.builder().departmentName("Timetable Field Validation Department").build());
+                DepartmentRequest.builder().departmentName(testName("Timetable Field Validation Department")).build());
         subjectService.createSubject(SubjectRequest.builder()
-                .subjectCode("VAL101")
+                .subjectCode(VAL_CODE)
                 .subjectName("Validation Test")
                 .semester(4)
                 .departmentId(department.getDepartmentId())
@@ -227,10 +275,10 @@ class SchedulerWorkflowIntegrationTest {
         MockMultipartFile timetable = new MockMultipartFile("file", "invalid-rooms.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 spreadsheetBytes(new String[][] {
-                        {"VAL101", "2098-12-31", "09:00", "", "101"},
-                        {"VAL101", "2098-12-31", "10:00", "Main Building", ""},
-                        {"VAL101", "2098-12-31", "11:00", oversizedBuilding, "102"},
-                        {"VAL101", "2098-12-31", "12:00", "Main Building", oversizedRoom}
+                        {VAL_CODE, "2098-12-31", "09:00", "", "101"},
+                        {VAL_CODE, "2098-12-31", "10:00", "Main Building", ""},
+                        {VAL_CODE, "2098-12-31", "11:00", oversizedBuilding, "102"},
+                        {VAL_CODE, "2098-12-31", "12:00", "Main Building", oversizedRoom}
                 }));
 
         ImportPreviewResponse preview = timetableImportService.previewTimetable(timetable);
@@ -249,14 +297,23 @@ class SchedulerWorkflowIntegrationTest {
     void setupLoginDataEntryStudentScheduleAndTimetableImportWorkTogether() throws Exception {
         AdministratorRequest admin = AdministratorRequest.builder()
                 .name("Test Admin")
-                .email("admin@example.com")
+                .email(ADMIN_EMAIL)
                 .password("AdminPass123")
                 .build();
+        String setupToken = MySqlTestProperties.adminSetupToken();
         assertThrows(IllegalArgumentException.class,
                 () -> authenticationService.bootstrapAdmin(admin, "wrong-token"));
-        authenticationService.bootstrapAdmin(admin, "workflow-test-setup-token");
+        if (administratorRepository.count() == 0) {
+            authenticationService.bootstrapAdmin(admin, setupToken);
+        } else {
+            // An existing administrator is preserved; login is still verified with a
+            // temporary test administrator that is rolled back with this transaction.
+            assertThrows(IllegalArgumentException.class,
+                    () -> authenticationService.bootstrapAdmin(admin, setupToken));
+            administratorService.registerAdmin(admin);
+        }
         assertThrows(IllegalArgumentException.class,
-                () -> authenticationService.bootstrapAdmin(admin, "workflow-test-setup-token"));
+                () -> authenticationService.bootstrapAdmin(admin, setupToken));
 
         var login = authenticationService.login(AuthenticationRequest.builder()
                 .email(admin.getEmail())
@@ -265,15 +322,15 @@ class SchedulerWorkflowIntegrationTest {
         assertEquals(admin.getEmail(), jwtService.extractUsername(login.getToken()));
 
         var department = departmentService.createDepartment(
-                DepartmentRequest.builder().departmentName("Computer Science").build());
+                DepartmentRequest.builder().departmentName(testName("Computer Science")).build());
         var subject = subjectService.createSubject(SubjectRequest.builder()
-                .subjectCode("CS101")
+                .subjectCode(CS_CODE)
                 .subjectName("Data Structures")
                 .semester(5)
                 .departmentId(department.getDepartmentId())
                 .build());
         var updatedSubject = subjectService.updateSubject(subject.getSubjectId(), SubjectRequest.builder()
-                .subjectCode("CS101")
+                .subjectCode(CS_CODE)
                 .subjectName("Data Structures Updated")
                 .semester(5)
                 .departmentId(department.getDepartmentId())
@@ -281,16 +338,16 @@ class SchedulerWorkflowIntegrationTest {
         assertEquals("Data Structures Updated", updatedSubject.getSubjectName());
         var student = studentService.registerStudent(StudentRequest.builder()
                 .name("Test Student")
-                .email("student@example.com")
+                .email(STUDENT_EMAIL)
                 .password("StudentPass123")
-                .enrollmentNumber("RB2101")
+                .enrollmentNumber(STUDENT_ROLL)
                 .semester(5)
                 .departmentId(department.getDepartmentId())
                 .build());
         var updatedStudent = studentService.updateStudent(student.getStudentId(), StudentRequest.builder()
                 .name("Test Student Updated")
-                .email("student@example.com")
-                .enrollmentNumber("RB2101")
+                .email(STUDENT_EMAIL)
+                .enrollmentNumber(STUDENT_ROLL)
                 .semester(5)
                 .departmentId(department.getDepartmentId())
                 .build());
@@ -306,13 +363,13 @@ class SchedulerWorkflowIntegrationTest {
                 .building("Updated Hall")
                 .build());
         assertEquals("Updated Hall", updatedExam.getBuilding());
-        assertEquals(1, studentService.getStudentSchedule("RB2101").size());
+        assertEquals(1, studentService.getStudentSchedule(STUDENT_ROLL).size());
         mockMvc.perform(get("/api/exams/search")
-                        .param("query", "CS101")
+                        .param("query", CS_CODE)
                         .param("semester", "5")
                         .param("date", "2026-11-12"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].subjectCode").value("CS101"));
+                .andExpect(jsonPath("$[0].subjectCode").value(CS_CODE));
         mockMvc.perform(get("/api/departments"))
                 .andExpect(status().isUnauthorized());
         assertThrows(DuplicateResourceException.class, () -> examService.createExam(firstExam));
@@ -329,18 +386,18 @@ class SchedulerWorkflowIntegrationTest {
         assertEquals(0, duplicateImport.getImported());
         assertEquals(1, duplicateImport.getSkippedDuplicates());
 
-        var schedule = studentService.getStudentSchedule("RB2101");
+        var schedule = studentService.getStudentSchedule(STUDENT_ROLL);
         assertEquals(2, schedule.size());
-        assertTrue(schedule.stream().allMatch(exam -> "CS101".equals(exam.getSubjectCode())));
+        assertTrue(schedule.stream().allMatch(exam -> CS_CODE.equals(exam.getSubjectCode())));
 
         var matrixSubjectOne = subjectService.createSubject(SubjectRequest.builder()
-                .subjectCode("24CS01TH0501")
+                .subjectCode(MATRIX_CODE_1)
                 .subjectName("Algorithms")
                 .semester(5)
                 .departmentId(department.getDepartmentId())
                 .build());
         var matrixSubjectTwo = subjectService.createSubject(SubjectRequest.builder()
-                .subjectCode("24CS01TH0502")
+                .subjectCode(MATRIX_CODE_2)
                 .subjectName("Operating Systems")
                 .semester(5)
                 .departmentId(department.getDepartmentId())
@@ -364,7 +421,7 @@ class SchedulerWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.skippedDuplicates").value(5));
 
         var savedMatrixExams = examService.getAllExams().stream()
-                .filter(exam -> List.of("24CS01TH0501", "24CS01TH0502").contains(exam.getSubjectCode()))
+                .filter(exam -> List.of(MATRIX_CODE_1, MATRIX_CODE_2).contains(exam.getSubjectCode()))
                 .toList();
         assertEquals(4, savedMatrixExams.size());
         assertTrue(savedMatrixExams.stream().allMatch(exam ->
@@ -386,8 +443,8 @@ class SchedulerWorkflowIntegrationTest {
 
         var imported = seatingPlanService.importPdf(seatingPdf, null);
 
-        assertEquals("Sessional Test 1", imported.getPlan().getTitle());
-        assertEquals("Department of Computer Science", imported.getPlan().getDepartmentName());
+        assertEquals(SEATING_TITLE, imported.getPlan().getTitle());
+        assertEquals(SEATING_DEPARTMENT, imported.getPlan().getDepartmentName());
         assertEquals(5, imported.getPlan().getSemester());
         assertEquals(4, imported.getImportedSeats());
         assertEquals(1, imported.getPlan().getRoomCount());
@@ -407,11 +464,11 @@ class SchedulerWorkflowIntegrationTest {
 
     @Test
     void importsStudentCsvSkipsDuplicatesAndRejectsInvalidRowsAtomically() throws Exception {
-        String departmentName = "Student Import Test Department";
+        String departmentName = testName("Student Import Test Department");
         departmentService.createDepartment(
                 DepartmentRequest.builder().departmentName(departmentName).build());
         String header = "Name,Email,Password,Roll Number,Semester,Department\r\n";
-        String validRow = "\"Doe, Jane\",bulk.one@example.com,ImportPass123,RB-IMPORT-001,4,"
+        String validRow = "\"Doe, Jane\"," + BULK_EMAIL + ",ImportPass123," + BULK_ROLL + ",4,"
                 + departmentName + "\r\n";
         MockMultipartFile studentFile = new MockMultipartFile(
                 "file", "students.csv", "text/csv",
@@ -421,7 +478,7 @@ class SchedulerWorkflowIntegrationTest {
         assertEquals(1, firstImport.getImported());
         assertEquals(0, firstImport.getSkippedDuplicates());
         assertTrue(studentService.getAllStudents().stream()
-                .anyMatch(student -> "RB-IMPORT-001".equals(student.getEnrollmentNumber())
+                .anyMatch(student -> BULK_ROLL.equals(student.getEnrollmentNumber())
                         && "Doe, Jane".equals(student.getName())));
 
         var repeatedImport = studentImportService.importStudents(studentFile);
@@ -429,9 +486,10 @@ class SchedulerWorkflowIntegrationTest {
         assertEquals(1, repeatedImport.getSkippedDuplicates());
 
         String invalidRows = header
-                + "Not Saved,not-saved@example.com,ImportPass123,RB-IMPORT-002,4,"
+                + "Not Saved,not-saved." + RUN_SUFFIX + "@example.test,ImportPass123," + NOT_SAVED_ROLL + ",4,"
                 + departmentName + "\r\n"
-                + "Invalid Semester,invalid-semester@example.com,ImportPass123,RB-IMPORT-003,9,"
+                + "Invalid Semester,invalid-semester." + RUN_SUFFIX + "@example.test,ImportPass123,"
+                + INVALID_SEMESTER_ROLL + ",9,"
                 + departmentName + "\r\n";
         MockMultipartFile invalidFile = new MockMultipartFile(
                 "file", "invalid-students.csv", "text/csv",
@@ -444,12 +502,12 @@ class SchedulerWorkflowIntegrationTest {
         assertEquals(3, rowError.rowNumber());
         assertTrue(rowError.message().contains("semester"));
         assertTrue(studentService.getAllStudents().stream()
-                .noneMatch(student -> "RB-IMPORT-002".equals(student.getEnrollmentNumber())));
+                .noneMatch(student -> NOT_SAVED_ROLL.equals(student.getEnrollmentNumber())));
     }
 
     @Test
     void importsStudentXlsxRosterAndSkipsRepeatedRollNumbers() throws Exception {
-        String departmentName = "Student Excel Import Test Department";
+        String departmentName = testName("Student Excel Import Test Department");
         departmentService.createDepartment(
                 DepartmentRequest.builder().departmentName(departmentName).build());
 
@@ -464,9 +522,9 @@ class SchedulerWorkflowIntegrationTest {
             }
             Row student = sheet.createRow(1);
             student.createCell(0).setCellValue("Excel Import Student");
-            student.createCell(1).setCellValue("excel.import@example.com");
+            student.createCell(1).setCellValue(EXCEL_EMAIL);
             student.createCell(2).setCellValue("ExcelImportPass123");
-            student.createCell(3).setCellValue("RB-EXCEL-001");
+            student.createCell(3).setCellValue(EXCEL_ROLL);
             student.createCell(4).setCellValue(6);
             student.createCell(5).setCellValue(departmentName);
             workbook.write(output);
@@ -487,7 +545,7 @@ class SchedulerWorkflowIntegrationTest {
         assertEquals(1, imported.getImported());
         assertEquals(0, imported.getSkippedDuplicates());
         assertTrue(studentService.getAllStudents().stream()
-                .anyMatch(savedStudent -> "RB-EXCEL-001".equals(savedStudent.getEnrollmentNumber())
+                .anyMatch(savedStudent -> EXCEL_ROLL.equals(savedStudent.getEnrollmentNumber())
                         && "Excel Import Student".equals(savedStudent.getName())));
 
         var repeatedImport = studentImportService.importStudents(studentFile);
@@ -498,18 +556,18 @@ class SchedulerWorkflowIntegrationTest {
     @Test
     void deletesDepartmentSubjectStudentAndExamRecords() throws Exception {
         var department = departmentService.createDepartment(
-                DepartmentRequest.builder().departmentName("Delete Workflow Test Department").build());
+                DepartmentRequest.builder().departmentName(testName("Delete Workflow Test Department")).build());
         var subject = subjectService.createSubject(SubjectRequest.builder()
-                .subjectCode("DEL101")
+                .subjectCode(DEL_CODE)
                 .subjectName("Deletion Test")
                 .semester(2)
                 .departmentId(department.getDepartmentId())
                 .build());
         var student = studentService.registerStudent(StudentRequest.builder()
                 .name("Delete Workflow Student")
-                .email("delete.workflow@example.com")
+                .email(DELETE_EMAIL)
                 .password("TestOnlyPass123")
-                .enrollmentNumber("RB-DELETE-001")
+                .enrollmentNumber(DELETE_ROLL)
                 .semester(2)
                 .departmentId(department.getDepartmentId())
                 .build());
@@ -543,7 +601,7 @@ class SchedulerWorkflowIntegrationTest {
     }
 
     private byte[] spreadsheetBytes() throws Exception {
-        return spreadsheetBytes(new String[][] {{"CS101", "2026-11-13", "13:30", "Science Block", "B-110"}});
+        return spreadsheetBytes(new String[][] {{CS_CODE, "2026-11-13", "13:30", "Science Block", "B-110"}});
     }
 
     private byte[] spreadsheetBytes(String[][] exams) throws Exception {
@@ -580,17 +638,17 @@ class SchedulerWorkflowIntegrationTest {
                 draw(content, font, page, "20-Nov-26", 250, 65);
                 draw(content, font, page, "Course Code", 50, 85);
                 draw(content, font, page, "Course Code", 250, 85);
-                draw(content, font, page, "24CS01TH0501", 50, 105);
-                draw(content, font, page, "24CS01TH0502", 250, 105);
-                draw(content, font, page, "24CS01TH0501*", 50, 120);
+                draw(content, font, page, MATRIX_CODE_1, 50, 105);
+                draw(content, font, page, MATRIX_CODE_2, 250, 105);
+                draw(content, font, page, MATRIX_CODE_1 + "*", 50, 120);
 
                 draw(content, font, page, "Time: 09:30", 30, 155);
                 draw(content, font, page, "18-Nov-26", 50, 175);
                 draw(content, font, page, "20-Nov-26", 250, 175);
                 draw(content, font, page, "Course Code", 50, 195);
                 draw(content, font, page, "Course Code", 250, 195);
-                draw(content, font, page, "24CS01TH0501", 50, 215);
-                draw(content, font, page, "24CS01TH0502", 250, 215);
+                draw(content, font, page, MATRIX_CODE_1, 50, 215);
+                draw(content, font, page, MATRIX_CODE_2, 250, 215);
             }
             document.save(output);
             return output.toByteArray();
@@ -603,9 +661,9 @@ class SchedulerWorkflowIntegrationTest {
             document.addPage(page);
             try (PDPageContentStream content = new PDPageContentStream(document, page)) {
                 PDType1Font font = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
-                draw(content, font, page, "Department of Computer Science", 35, 60);
+                draw(content, font, page, SEATING_DEPARTMENT, 35, 60);
                 draw(content, font, page, "5th Semester", 35, 80);
-                draw(content, font, page, "Sessional Test 1", 35, 100);
+                draw(content, font, page, SEATING_TITLE, 35, 100);
                 draw(content, font, page, "Class Room No: DT-101", 35, 130);
                 draw(content, font, page, "A1-1", 80, 200);
                 draw(content, font, page, "A1-2", 230, 200);

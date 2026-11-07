@@ -35,7 +35,7 @@ public class TimetableImportService {
 
     private static final int MAX_PREVIEW_ROWS = 200;
 
-    private static final Set<String> REQUIRED_HEADERS = Set.of("subjectCode", "date", "time", "building", "room");
+    private static final Set<String> REQUIRED_HEADERS = Set.of("subjectCode", "date", "time");
     private static final Pattern MATRIX_DATE = Pattern.compile("(?i)^\\d{1,2}-[a-z]{3}-\\d{2,4}$");
     private static final Pattern MATRIX_SUBJECT_CODE = Pattern.compile(
             "(?i)^(?=.*[a-z])(?=.*\\d)[a-z0-9]{8,}(?:-[a-z0-9]+)*$");
@@ -136,8 +136,10 @@ public class TimetableImportService {
                 String rawEndTime = cell(row, columns, "endTime").trim();
                 String building = cell(row, columns, "building").trim();
                 String room = cell(row, columns, "room").trim();
-                if (subjectCode.isBlank() || building.isBlank() || room.isBlank()) {
-                    throw new IllegalArgumentException("subject code, building, and room are required");
+                if (building.isBlank()) building = "Not assigned";
+                if (room.isBlank()) room = "Not assigned";
+                if (subjectCode.isBlank()) {
+                    throw new IllegalArgumentException("subject code is required");
                 }
                 if (building.length() > 100 || room.length() > 20) {
                     throw new IllegalArgumentException("building must be at most 100 characters and room at most 20");
@@ -650,7 +652,7 @@ public class TimetableImportService {
             if (key != null) columns.put(key, index);
         }
         if (!columns.keySet().containsAll(REQUIRED_HEADERS)) {
-            throw new IllegalArgumentException("Required headers: Subject Code, Date, Time, Building, Room. Use those labels or their common equivalents.");
+            throw new IllegalArgumentException("Required headers: Subject Code, Date, Time. Building and Room are optional and default to \"Not assigned\".");
         }
         return columns;
     }

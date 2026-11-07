@@ -147,12 +147,12 @@ Students can search by enrollment number or browse published exams without loggi
 
 ### MySQL integration-test database
 
-Spring integration tests use a separate MySQL database named `campus_exam_scheduler_test`. The tests use `ddl-auto=create-drop` after validating that the JDBC URL points exactly to this test database, so only its tables are recreated and dropped when the test context closes. Keep this test database separate from the application database `campus_exam_scheduler`.
+Spring integration tests use the existing `campus_exam_scheduler` schema. The test configuration validates that the JDBC URL targets exactly this schema, sets `ddl-auto=none`, and disables SQL initialization, so it never creates, alters, truncates, or drops tables. Each integration test runs in a transaction and rolls back its own clearly prefixed records; existing data is preserved.
 
-Set these variables in the test process or IDE run configuration. The root .env.example contains placeholders; Spring does not automatically load a root .env file.
+Set these variables in the test process or IDE run configuration. If they are omitted, the tests fall back to the `SPRING_DATASOURCE_*` values. The root .env.example contains placeholders; Spring does not automatically load a root .env file.
 
 ```powershell
-$env:TEST_DATASOURCE_URL = "jdbc:mysql://localhost:3306/campus_exam_scheduler_test?serverTimezone=UTC"
+$env:TEST_DATASOURCE_URL = "jdbc:mysql://localhost:3306/campus_exam_scheduler?serverTimezone=UTC"
 $env:TEST_DATASOURCE_USERNAME = "<your-mysql-username>"
 $env:TEST_DATASOURCE_PASSWORD = "<your-mysql-password>"
 ```
@@ -184,7 +184,7 @@ docker build -f backend/Dockerfile backend
 ## Security and data handling
 
 - Never commit passwords, tokens, database URLs containing credentials, or `.env` files.
-- Use a database whose data can be recreated before running integration tests.
+- Integration tests target the existing `campus_exam_scheduler` schema but roll back all records they create; do not add `create-drop` or other destructive DDL to the test profile.
 - The application uses `ddl-auto=update`; review database permissions and backups before connecting it to an existing schema.
 - Do not use the demo SQL script against production data.
 

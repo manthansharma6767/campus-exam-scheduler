@@ -283,8 +283,13 @@ class SchedulerWorkflowIntegrationTest {
 
         ImportPreviewResponse preview = timetableImportService.previewTimetable(timetable);
 
-        assertEquals(0, preview.validRows());
-        assertEquals(4, preview.errors().size());
+        // Missing venues are intentionally accepted and defaulted to "Not assigned";
+        // oversized field values remain hard validation errors.
+        assertEquals(2, preview.validRows());
+        assertEquals(2, preview.errors().size());
+        assertTrue(preview.rows().stream().allMatch(row ->
+                "Not assigned".equals(row.values().get("Building"))
+                        || "Not assigned".equals(row.values().get("Room"))));
         assertTrue(preview.errors().toString().contains("building"));
         assertTrue(preview.errors().toString().contains("room"));
         assertFalse(preview.canImport());

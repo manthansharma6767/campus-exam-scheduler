@@ -36,7 +36,12 @@ public class ScheduleConflictService {
 
             var candidateSubject = candidate.getSubject();
             var scheduledSubject = scheduled.getSubject();
-            if (!Objects.equals(candidateSubject.getSubjectId(), scheduledSubject.getSubjectId())
+            // Section variants such as 24CS01TH0506-1 and 24CS01TH0506-2 are parallel
+            // papers for the same course, so they are expected to share a time slot.
+            boolean parallelSection = samePaperFamily(
+                    candidateSubject.getSubjectCode(), scheduledSubject.getSubjectCode());
+            if (!parallelSection
+                    && !Objects.equals(candidateSubject.getSubjectId(), scheduledSubject.getSubjectId())
                     && candidateSubject.getSemester() != null
                     && scheduledSubject.getSemester() != null
                     && Objects.equals(candidateSubject.getSemester(), scheduledSubject.getSemester())
@@ -65,6 +70,22 @@ public class ScheduleConflictService {
 
         return left.getExamTime().isBefore(right.getExamEndTime())
                 && right.getExamTime().isBefore(left.getExamEndTime());
+    }
+
+    private boolean samePaperFamily(String leftCode, String rightCode) {
+        String leftBase = basePaperCode(leftCode);
+        String rightBase = basePaperCode(rightCode);
+        return !leftBase.isBlank() && leftBase.equals(rightBase);
+    }
+
+    private String basePaperCode(String subjectCode) {
+        if (subjectCode == null) return "";
+        String normalized = subjectCode.trim().toUpperCase(Locale.ROOT);
+        int dash = normalized.lastIndexOf('-');
+        if (dash > 0 && normalized.length() - dash - 1 <= 2) {
+            return normalized.substring(0, dash);
+        }
+        return normalized;
     }
 
     private boolean sameAssignedRoom(Exam left, Exam right) {

@@ -258,7 +258,7 @@ export default function Exams() {
             </Box>
 
             <Typography variant="body2" sx={{ color: '#B0B0B0', textAlign: 'right', mb: 2 }}>
-              Excel headers: Subject Code, Date, Time, Building, Room. Text-based PDFs support aligned rows and date-by-course matrices; missing venues import as “Not assigned”. Scanned/image-only PDFs need OCR first.
+              Excel headers: Subject Code, Date, Time, Building, Room. PDFs support aligned rows, date-by-course matrices, and scanned pages via OCR; missing venues import as "Not assigned".
             </Typography>
 
             {loading ? (
@@ -316,7 +316,7 @@ export default function Exams() {
           <DialogContent>
             {importError && <Alert severity="error" sx={{ mt: 1, mb: 2 }}>{importError}</Alert>}
             <Typography color="text.secondary" sx={{ mb: 2 }}>
-              Review the parsed timetable and resolve validation errors or room/student schedule conflicts before saving. Nothing is saved during preview.
+              Review the parsed timetable and resolve validation errors or room/student schedule conflicts before saving. Scanned PDFs are processed with OCR and may take a little longer. Nothing is saved during preview.
             </Typography>
             <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} disabled={importing}>
               Choose PDF or Excel file

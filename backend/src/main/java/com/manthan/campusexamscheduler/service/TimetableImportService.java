@@ -102,11 +102,14 @@ public class TimetableImportService {
 
         String filename = Optional.ofNullable(file.getOriginalFilename()).orElse("").toLowerCase(Locale.ROOT);
         List<String[]> rows;
+        List<ImportRowError> readErrors = List.of();
         try {
             if (filename.endsWith(".xlsx") || filename.endsWith(".xls")) {
                 rows = readSpreadsheet(file);
             } else if (filename.endsWith(".pdf")) {
-                rows = readPdf(file);
+                ScannedPdfTimetableReader.ScanResult pdf = readPdf(file);
+                rows = pdf.rows();
+                readErrors = pdf.errors();
             } else {
                 throw new IllegalArgumentException("Supported files are PDF, XLS, and XLSX.");
             }
@@ -115,12 +118,12 @@ public class TimetableImportService {
         }
 
         int headerRow = findHeaderRow(rows);
-        if (headerRow < 0 || rows.size() <= headerRow + 1) {
+        if (headerRow < 0 || (rows.size() <= headerRow + 1 && readErrors.isEmpty())) {
             throw new IllegalArgumentException("The timetable must contain a header row and at least one exam row.");
         }
         Map<String, Integer> columns = headerColumns(rows.get(headerRow));
         List<ExamCandidate> candidates = new ArrayList<>();
-        List<ImportRowError> errors = new ArrayList<>();
+        List<ImportRowError> errors = new ArrayList<>(readErrors);
         Set<String> seenInFile = new HashSet<>();
         int skippedDuplicates = 0;
 
@@ -284,7 +287,7 @@ public class TimetableImportService {
         return rows;
     }
 
-    private List<String[]> readPdf(MultipartFile file) throws IOException {
+    private ScannedPdfTimetableReader.ScanResult readPdf(MultipartFile file) throws IOException {
         try (var document = Loader.loadPDF(file.getBytes())) {
             Map<PdfLineKey, List<TextPosition>> positionedLines = new LinkedHashMap<>();
             PDFTextStripper stripper = new PDFTextStripper() {
@@ -315,11 +318,11 @@ public class TimetableImportService {
                     .toList();
 
             if (pdfLines.isEmpty()) {
-                throw new IllegalArgumentException("This PDF contains no selectable text. Scanned/image-only PDFs need OCR before import; try exporting the timetable as a text-based PDF or Excel file.");
+                return ScannedPdfTimetableReader.read(document);
             }
 
             List<String[]> matrixRows = parseMatrixPdf(pdfLines);
-            if (matrixRows != null) return matrixRows;
+            if (matrixRows != null) return new ScannedPdfTimetableReader.ScanResult(matrixRows, List.of());
 
             List<String[]> rows = new ArrayList<>();
             int headerLine = -1;
@@ -347,10 +350,10 @@ public class TimetableImportService {
             }
 
             if (headerLine < 0) {
-                return pdfLines.stream()
+                return new ScannedPdfTimetableReader.ScanResult(pdfLines.stream()
                         .map(line -> Optional.ofNullable(splitPdfCells(line.text())).orElseGet(() -> new String[] { line.text().trim() }))
                         .filter(row -> Arrays.stream(row).anyMatch(value -> value != null && !value.isBlank()))
-                        .toList();
+                        .toList(), List.of());
             }
 
             for (int index = 0; index < headerLine; index++) {
@@ -371,7 +374,7 @@ public class TimetableImportService {
                     rows.add(cells);
                 }
             }
-            return rows;
+            return new ScannedPdfTimetableReader.ScanResult(rows, List.of());
         }
     }
 
@@ -693,6 +696,8 @@ public class TimetableImportService {
                 .replaceAll("^[\\[(]+|[\\])]+$", "")
                 .trim()
                 .toUpperCase(Locale.ROOT)
+                .replaceAll("\\bNOON\\b", "PM")
+                .replaceAll("\\bMIDNIGHT\\b", "AM")
                 .replaceAll("A\\.?M\\.?", "AM")
                 .replaceAll("P\\.?M\\.?", "PM")
                 .replace('.', ':')

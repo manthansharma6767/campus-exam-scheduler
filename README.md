@@ -10,7 +10,7 @@ Campus Exam Scheduler is a full-stack application for publishing examination tim
 - JWT-protected administration area
 - Department, subject, student, and exam CRUD management
 - Student roster import from CSV, XLS, and XLSX
-- Timetable import from XLS, XLSX, and text-based PDF files
+- Timetable import from XLS, XLSX, and PDF files, including scanned/image-only PDFs via OCR
 - Import previews with row-level validation errors
 - Duplicate detection and safe, repeatable imports
 - Timetable conflict detection for overlapping rooms and student cohorts
@@ -29,7 +29,7 @@ Campus Exam Scheduler is a full-stack application for publishing examination tim
 | --- | --- |
 | Backend | Java 17, Spring Boot, Spring Security, Spring Data JPA, JWT |
 | Database | MySQL 8+ |
-| File processing | Apache POI, Apache PDFBox |
+| File processing | Apache POI, Apache PDFBox, Tesseract OCR |
 | Frontend | React 19, Vite, Material UI, React Router, Axios |
 | API documentation | Springdoc OpenAPI / Swagger UI |
 
@@ -50,6 +50,7 @@ Campus Exam Scheduler is a full-stack application for publishing examination tim
 - Node.js and npm
 - MySQL 8 or newer
 - Git
+- Tesseract OCR 5 or newer (only needed for scanned/image-only timetable PDFs)
 
 ## Local setup
 
@@ -127,13 +128,13 @@ Departments can be identified by name or ID. The import preview hides passwords 
 
 ### Timetable import
 
-Open **Exam Management → Import timetable** and upload an XLS, XLSX, or text-based PDF file. A row-based timetable can use:
+Open **Exam Management → Import timetable** and upload an XLS, XLSX, or PDF file. A row-based timetable can use:
 
 | Subject Code | Date | Time | Building | Room |
 | --- | --- | --- | --- | --- |
 | CS101 | 2026-11-12 | 09:00 | Main Building | 204 |
 
-Excel imports read the first worksheet and allow a title above the header. PDFs must contain selectable text; scanned PDFs require OCR and are not supported. The preview reports invalid rows, duplicates, and room or cohort conflicts before saving. Imports with validation errors or conflicts are rejected without partial writes. Reimporting the same timetable skips existing exams identified by subject, date, and start time.
+Excel imports read the first worksheet and allow a title above the header. Text-based PDFs support aligned rows and date-by-course matrices. Scanned/image-only PDFs are read with the Tesseract OCR engine; the backend looks for `tesseract` on `PATH`, then the standard Windows install path, or uses the executable named by `TESSERACT_CMD`. The preview reports invalid rows, uncertain OCR fields, duplicates, and room or cohort conflicts before saving. Imports with validation errors or conflicts are rejected without partial writes. Reimporting the same timetable skips existing exams identified by subject, date, and start time.
 
 ### Seating plans
 

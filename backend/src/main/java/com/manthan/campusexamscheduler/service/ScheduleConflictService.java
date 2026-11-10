@@ -2,6 +2,7 @@ package com.manthan.campusexamscheduler.service;
 
 import com.manthan.campusexamscheduler.dto.ConflictDetail;
 import com.manthan.campusexamscheduler.entity.Exam;
+import com.manthan.campusexamscheduler.entity.ExamType;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -40,7 +41,10 @@ public class ScheduleConflictService {
             // papers for the same course, so they are expected to share a time slot.
             boolean parallelSection = samePaperFamily(
                     candidateSubject.getSubjectCode(), scheduledSubject.getSubjectCode());
-            if (!parallelSection
+            // Absentee papers are supplementary sittings and may deliberately share a slot
+            // with the regular timetable, so only compare student clashes within the same type.
+            if (effectiveType(candidate) == effectiveType(scheduled)
+                    && !parallelSection
                     && !Objects.equals(candidateSubject.getSubjectId(), scheduledSubject.getSubjectId())
                     && candidateSubject.getSemester() != null
                     && scheduledSubject.getSemester() != null
@@ -86,6 +90,10 @@ public class ScheduleConflictService {
             return normalized.substring(0, dash);
         }
         return normalized;
+    }
+
+    private ExamType effectiveType(Exam exam) {
+        return exam.getExamType() == null ? ExamType.REGULAR : exam.getExamType();
     }
 
     private boolean sameAssignedRoom(Exam left, Exam right) {

@@ -19,17 +19,20 @@ import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Alert from '@mui/material/Alert';
+import Tooltip from '@mui/material/Tooltip';
 import Snackbar from '@mui/material/Snackbar';
 import Fade from '@mui/material/Fade';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
 import PeopleIcon from '@mui/icons-material/People';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Loading from '../components/Loading';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ImportPreviewPanel from '../components/ImportPreviewPanel';
+import AbsenteeEligibilityDialog from '../components/AbsenteeEligibilityDialog';
 import api from '../services/api';
 
 const emptyForm = { name: '', email: '', password: '', enrollmentNumber: '', semester: '', departmentId: '' };
@@ -52,6 +55,7 @@ export default function Students() {
   const [importing, setImporting] = useState(false);
   const [importAction, setImportAction] = useState('');
   const [importPreview, setImportPreview] = useState(null);
+  const [absenteeStudent, setAbsenteeStudent] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -289,7 +293,12 @@ export default function Students() {
                         <TableCell>{stu.semester}</TableCell>
                         <TableCell>{stu.departmentName}</TableCell>
                         <TableCell align="right">
-                          <IconButton onClick={() => openEdit(stu)} aria-label={`Edit ${stu.name}`} size="small" sx={{ color: '#FF8F00' }}>
+                          <Tooltip title="Manage absentee papers">
+                            <IconButton onClick={() => setAbsenteeStudent(stu)} aria-label={`Manage absentee papers for ${stu.name}`} size="small" sx={{ color: '#FFB300' }}>
+                              <EventBusyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <IconButton onClick={() => openEdit(stu)} aria-label={`Edit ${stu.name}`} size="small" sx={{ color: '#FF8F00', ml: 0.5 }}>
                             <EditIcon fontSize="small" />
                           </IconButton>
                           <IconButton color="error" onClick={() => { setDeleteTarget(stu); setConfirmOpen(true); }} aria-label={`Delete ${stu.name}`} size="small" sx={{ ml: 0.5 }}>
@@ -352,6 +361,13 @@ export default function Students() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <AbsenteeEligibilityDialog
+          open={Boolean(absenteeStudent)}
+          student={absenteeStudent}
+          onClose={() => setAbsenteeStudent(null)}
+          onSaved={() => setSnackbar({ open: true, message: 'Absentee papers updated successfully', severity: 'success' })}
+        />
 
         {/* Add/Edit Dialog */}
         <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth aria-labelledby="student-dialog-title">

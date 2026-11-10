@@ -1,5 +1,6 @@
 package com.manthan.campusexamscheduler.dto;
 
+import com.manthan.campusexamscheduler.entity.ExamType;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -25,4 +26,6 @@ public class StudentScheduleResponse {
     private String building;
 
     private String roomNumber;
+
+    private ExamType examType;
 }

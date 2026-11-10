@@ -19,7 +19,7 @@ import Loading from '../components/Loading';
 import api from '../services/api';
 import { getExamKey, readPersonalSchedule, saveExamToPersonalSchedule, removeExamFromPersonalSchedule } from '../utils/personalSchedule';
 
-const emptyFilters = { query: '', semester: '', date: '' };
+const emptyFilters = { query: '', semester: '', date: '', examType: '' };
 
 function savedBrowseKeys() {
   return new Set(readPersonalSchedule()
@@ -106,7 +106,7 @@ export default function BrowseExams() {
               </Typography>
             </Stack>
             <Typography sx={{ opacity: 0.75, mt: 1 }}>
-              Find exams by subject, course code, venue, semester, or date. Save the exams you want to your personal calendar.
+              Find regular and absentee exams by subject, course code, venue, semester, or date. Save the exams you want to your personal calendar.
             </Typography>
           </Container>
         </Box>
@@ -115,7 +115,7 @@ export default function BrowseExams() {
           <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
             <Paper component="form" onSubmit={handleSearch} elevation={0} sx={{ p: { xs: 2, md: 3 }, mb: 3, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 3, backgroundColor: '#242424' }}>
               <Grid container spacing={2} sx={{ alignItems: 'center' }}>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
                     name="query"
                     label="Subject, course code, building, or room"
@@ -125,12 +125,19 @@ export default function BrowseExams() {
                     slotProps={{ htmlInput: { 'aria-label': 'Search exams by subject, course code, building or room' } }}
                   />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                   <TextField name="semester" label="Semester" select value={filters.semester} onChange={handleFilterChange} fullWidth>
                     <MenuItem value="">Any semester</MenuItem>
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((semester) => (
                       <MenuItem key={semester} value={semester}>Semester {semester}</MenuItem>
                     ))}
+                  </TextField>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <TextField name="examType" label="Exam type" select value={filters.examType} onChange={handleFilterChange} fullWidth>
+                    <MenuItem value="">Any type</MenuItem>
+                    <MenuItem value="REGULAR">Regular</MenuItem>
+                    <MenuItem value="ABSENTEE">Absentee</MenuItem>
                   </TextField>
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>

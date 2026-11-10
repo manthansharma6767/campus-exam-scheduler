@@ -14,7 +14,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import ExamCard from '../components/ExamCard';
-import { downloadCalendar, readPersonalSchedule, removeExamFromPersonalSchedule } from '../utils/personalSchedule';
+import { downloadCalendar, getExamKey, readPersonalSchedule, removeExamFromPersonalSchedule } from '../utils/personalSchedule';
 
 export default function MySchedule() {
   const [exams, setExams] = useState([]);
@@ -69,7 +69,7 @@ export default function MySchedule() {
                 <Alert severity="info" sx={{ mb: 3 }}>Calendar events use imported or saved end times when available. The selected fallback duration applies to exams without an end time. Events use India Standard Time.</Alert>
                 <Grid container spacing={3}>
                   {exams.map((exam) => (
-                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={`${exam.enrollmentNumber}-${exam.subjectCode}-${exam.examDate}-${exam.examTime}`}>
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={getExamKey(exam, exam.enrollmentNumber)}>
                       <ExamCard exam={exam} selected onToggle={() => removeExam(exam)} enrollmentNumber={exam.enrollmentNumber} />
                     </Grid>
                   ))}

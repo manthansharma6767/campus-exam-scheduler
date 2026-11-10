@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'personal_exam_schedule';
 
 export function getExamKey(exam, enrollmentNumber) {
-  return [enrollmentNumber, exam.subjectCode, exam.examDate, exam.examTime]
+  return [enrollmentNumber, exam.subjectCode, exam.examDate, exam.examTime, exam.examType || 'REGULAR']
     .map((part) => String(part || '').trim().toUpperCase())
     .join('|');
 }
@@ -31,6 +31,63 @@ export function removeExamFromPersonalSchedule(exam, enrollmentNumber) {
   );
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   return updated;
+}
+
+/**
+ * Keep saved calendar entries in sync with the student's current schedule.
+ * When a subject switches between regular and absentee, the saved entry is
+ * replaced with the paper that is now scheduled for that subject.
+ */
+export function reconcilePersonalSchedule(exams, enrollmentNumber) {
+  const currentEnrollment = String(enrollmentNumber || '').trim().toUpperCase();
+  const scheduleByKey = new Map();
+  const scheduleBySubject = new Map();
+
+  exams.forEach((exam) => {
+    scheduleByKey.set(getExamKey(exam, enrollmentNumber), exam);
+    const subjectKey = String(exam.subjectCode || '').trim().toUpperCase();
+    if (subjectKey && !scheduleBySubject.has(subjectKey)) {
+      scheduleBySubject.set(subjectKey, exam);
+    }
+  });
+
+  const allSaved = readPersonalSchedule();
+  const otherEnrollments = allSaved.filter(
+    (item) => String(item.enrollmentNumber || '').trim().toUpperCase() !== currentEnrollment
+  );
+  const currentEnrollmentSaved = [];
+  const seenKeys = new Set();
+  let changed = false;
+
+  allSaved.forEach((item) => {
+    if (String(item.enrollmentNumber || '').trim().toUpperCase() !== currentEnrollment) return;
+
+    const savedKey = getExamKey(item, item.enrollmentNumber);
+    const replacement = scheduleByKey.get(savedKey)
+      || scheduleBySubject.get(String(item.subjectCode || '').trim().toUpperCase());
+
+    if (!replacement) {
+      changed = true;
+      return;
+    }
+
+    const replacementEntry = { ...replacement, enrollmentNumber };
+    const replacementKey = getExamKey(replacementEntry, enrollmentNumber);
+    if (seenKeys.has(replacementKey)) {
+      changed = true;
+      return;
+    }
+
+    seenKeys.add(replacementKey);
+    currentEnrollmentSaved.push(replacementEntry);
+    if (savedKey !== replacementKey) changed = true;
+  });
+
+  if (changed) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...otherEnrollments, ...currentEnrollmentSaved]));
+  }
+
+  return currentEnrollmentSaved;
 }
 
 function escapeIcs(value) {
@@ -86,7 +143,7 @@ export function downloadCalendar(exams, durationMinutes = 180) {
       `DTEND:${format(end)}`,
       `SUMMARY:${escapeIcs(`${exam.subjectCode} - ${exam.subjectName}`)}`,
       `LOCATION:${escapeIcs(`${exam.building}, Room ${exam.roomNumber}`)}`,
-      `DESCRIPTION:${escapeIcs(`${exam.subjectCode} exam`)}`,
+      `DESCRIPTION:${escapeIcs(`${exam.subjectCode} ${exam.examType === 'ABSENTEE' ? 'absentee ' : ''}exam`)}`,
       'END:VEVENT',
     ];
   });

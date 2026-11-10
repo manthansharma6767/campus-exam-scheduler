@@ -2,6 +2,7 @@ package com.manthan.campusexamscheduler.controller;
 
 import com.manthan.campusexamscheduler.dto.ExamRequest;
 import com.manthan.campusexamscheduler.dto.ExamResponse;
+import com.manthan.campusexamscheduler.entity.ExamType;
 import com.manthan.campusexamscheduler.service.ExamService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,8 +24,9 @@ public class ExamController {
     public ResponseEntity<List<ExamResponse>> searchPublicExams(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Integer semester,
-            @RequestParam(required = false) LocalDate date) {
-        return ResponseEntity.ok(examService.searchPublicExams(query, semester, date));
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false) ExamType examType) {
+        return ResponseEntity.ok(examService.searchPublicExams(query, semester, date, examType));
     }
 
     @PostMapping

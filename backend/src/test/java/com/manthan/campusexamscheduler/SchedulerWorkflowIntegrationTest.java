@@ -8,6 +8,7 @@ import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
 import com.manthan.campusexamscheduler.dto.ImportRowError;
 import com.manthan.campusexamscheduler.dto.StudentRequest;
 import com.manthan.campusexamscheduler.dto.SubjectRequest;
+import com.manthan.campusexamscheduler.entity.ExamType;
 import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.exception.ImportValidationException;
 import com.manthan.campusexamscheduler.exception.ScheduleConflictException;
@@ -61,6 +62,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -77,7 +79,9 @@ class SchedulerWorkflowIntegrationTest {
     private static final String BULK_EMAIL = "bulk.one." + RUN_SUFFIX + "@example.test";
     private static final String EXCEL_EMAIL = "excel.import." + RUN_SUFFIX + "@example.test";
     private static final String DELETE_EMAIL = "delete.workflow." + RUN_SUFFIX + "@example.test";
+    private static final String ABSENTEE_EMAIL = "absentee." + RUN_SUFFIX + "@example.test";
     private static final String STUDENT_ROLL = "RB-" + RUN_ID + "-01";
+    private static final String ABSENTEE_ROLL = "RB-" + RUN_ID + "-AB";
     private static final String PREVIEW_ROLL = "RB-" + RUN_ID + "-P1";
     private static final String INVALID_PREVIEW_ROLL = "RB-" + RUN_ID + "-P2";
     private static final String BULK_ROLL = "RB-" + RUN_ID + "-I1";
@@ -92,6 +96,8 @@ class SchedulerWorkflowIntegrationTest {
     private static final String DEL_CODE = testCode("DEL");
     private static final String MATRIX_CODE_1 = RUN_ID + "TH0501";
     private static final String MATRIX_CODE_2 = RUN_ID + "TH0502";
+    private static final String ABSENTEE_CODE = testCode("ABS");
+    private static final String ABSENTEE_CODE_2 = testCode("AB2");
     private static final String SEATING_TITLE = "Sessional Test 1 " + RUN_ID;
     private static final String SEATING_DEPARTMENT = "Department of Computer Science " + RUN_ID;
 
@@ -556,6 +562,107 @@ class SchedulerWorkflowIntegrationTest {
         var repeatedImport = studentImportService.importStudents(studentFile);
         assertEquals(0, repeatedImport.getImported());
         assertEquals(1, repeatedImport.getSkippedDuplicates());
+    }
+
+    @Test
+    void studentCanSelfDeclareAbsenceAndOnlyAbsenteePaperAppears() throws Exception {
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName(testName("Absentee Eligibility Department")).build());
+        var missedSubject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode(ABSENTEE_CODE)
+                .subjectName("Cloud Computing Absentee Test")
+                .semester(5)
+                .departmentId(department.getDepartmentId())
+                .build());
+        var attendedSubject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode(ABSENTEE_CODE_2)
+                .subjectName("Attended Paper Test")
+                .semester(5)
+                .departmentId(department.getDepartmentId())
+                .build());
+        var student = studentService.registerStudent(StudentRequest.builder()
+                .name("Absentee Test Student")
+                .email(ABSENTEE_EMAIL)
+                .password("StudentPass123")
+                .enrollmentNumber(ABSENTEE_ROLL)
+                .semester(5)
+                .departmentId(department.getDepartmentId())
+                .build());
+
+        examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2026, 11, 3))
+                .examTime(LocalTime.of(11, 0))
+                .examEndTime(LocalTime.of(12, 0))
+                .roomNumber("A-101")
+                .building("Main Building")
+                .subjectId(missedSubject.getSubjectId())
+                .examType(ExamType.REGULAR)
+                .build());
+        examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2026, 11, 4))
+                .examTime(LocalTime.of(11, 0))
+                .examEndTime(LocalTime.of(12, 0))
+                .roomNumber("A-102")
+                .building("Main Building")
+                .subjectId(attendedSubject.getSubjectId())
+                .examType(ExamType.REGULAR)
+                .build());
+        var absenteeExam = examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2026, 11, 13))
+                .examTime(LocalTime.of(15, 0))
+                .examEndTime(LocalTime.of(16, 0))
+                .roomNumber("Not assigned")
+                .building("Not assigned")
+                .subjectId(missedSubject.getSubjectId())
+                .examType(ExamType.ABSENTEE)
+                .build());
+
+        assertEquals(2, studentService.getStudentSchedule(ABSENTEE_ROLL).size());
+
+        mockMvc.perform(get("/api/students/{enrollmentNumber}/absentee-eligibility", ABSENTEE_ROLL))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].subjectCode").value(ABSENTEE_CODE))
+                .andExpect(jsonPath("$[0].assigned").value(false));
+
+        mockMvc.perform(put("/api/students/{enrollmentNumber}/absentee-eligibility", ABSENTEE_ROLL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"examIds\":[" + absenteeExam.getExamId() + "]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].assigned").value(true));
+
+        var schedule = studentService.getStudentSchedule(ABSENTEE_ROLL);
+        assertEquals(2, schedule.size());
+        assertTrue(schedule.stream().anyMatch(exam ->
+                ABSENTEE_CODE_2.equals(exam.getSubjectCode())
+                        && exam.getExamType() == ExamType.REGULAR));
+        assertTrue(schedule.stream().anyMatch(exam ->
+                ABSENTEE_CODE.equals(exam.getSubjectCode())
+                        && exam.getExamType() == ExamType.ABSENTEE));
+        assertFalse(schedule.stream().anyMatch(exam ->
+                ABSENTEE_CODE.equals(exam.getSubjectCode())
+                        && exam.getExamType() == ExamType.REGULAR));
+
+        mockMvc.perform(get("/api/students/{enrollmentNumber}/schedule", ABSENTEE_ROLL))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].subjectCode").value(ABSENTEE_CODE_2))
+                .andExpect(jsonPath("$[1].subjectCode").value(ABSENTEE_CODE))
+                .andExpect(jsonPath("$[1].examType").value("ABSENTEE"));
+
+        mockMvc.perform(get("/api/students/{studentId}/absentee-exams", student.getStudentId())
+                        .with(user("test-admin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].assigned").value(true));
+
+        mockMvc.perform(put("/api/students/{enrollmentNumber}/absentee-eligibility", ABSENTEE_ROLL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"examIds\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].assigned").value(false));
+        var restoredSchedule = studentService.getStudentSchedule(ABSENTEE_ROLL);
+        assertEquals(2, restoredSchedule.size());
+        assertTrue(restoredSchedule.stream().allMatch(exam -> exam.getExamType() == ExamType.REGULAR));
     }
 
     @Test

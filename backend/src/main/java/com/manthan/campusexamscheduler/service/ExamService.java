@@ -2,11 +2,13 @@ package com.manthan.campusexamscheduler.service;
 import com.manthan.campusexamscheduler.dto.ExamRequest;
 import com.manthan.campusexamscheduler.dto.ExamResponse;
 import com.manthan.campusexamscheduler.entity.Exam;
+import com.manthan.campusexamscheduler.entity.ExamType;
 import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.exception.ScheduleConflictException;
 import com.manthan.campusexamscheduler.repository.ExamRepository;
+import com.manthan.campusexamscheduler.repository.StudentAbsenteeExamRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,15 +23,17 @@ public class ExamService {
 
     private final ExamRepository examRepository;
     private final SubjectRepository subjectRepository;
+    private final StudentAbsenteeExamRepository studentAbsenteeExamRepository;
     private final ScheduleConflictService scheduleConflictService;
 
     @Transactional(readOnly = true)
-    public List<ExamResponse> searchPublicExams(String query, Integer semester, LocalDate examDate) {
+    public List<ExamResponse> searchPublicExams(
+            String query, Integer semester, LocalDate examDate, ExamType examType) {
         if (semester != null && (semester < 1 || semester > 8)) {
             throw new IllegalArgumentException("Semester must be between 1 and 8.");
         }
         String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
-        return examRepository.searchPublicExams(normalizedQuery, semester, examDate)
+        return examRepository.searchPublicExams(normalizedQuery, semester, examDate, examType)
                 .stream()
                 .map(exam -> ExamResponse.builder()
                         .examId(exam.getExamId())
@@ -41,6 +45,7 @@ public class ExamService {
                         .subjectCode(exam.getSubject().getSubjectCode())
                         .subjectName(exam.getSubject().getSubjectName())
                         .building(exam.getBuilding())
+                        .examType(exam.getExamType())
                         .build())
                 .toList();
     }
@@ -48,6 +53,7 @@ public class ExamService {
     @Transactional
     public ExamResponse createExam(ExamRequest request) {
         validateExamTimes(request);
+        ExamType examType = request.getExamType() == null ? ExamType.REGULAR : request.getExamType();
 
         // Check if subject exists
         Subject subject = subjectRepository
@@ -55,9 +61,9 @@ public class ExamService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Subject not found"));
 
-        if (examRepository.existsBySubject_SubjectIdAndExamDateAndExamTime(
-                subject.getSubjectId(), request.getExamDate(), request.getExamTime())) {
-            throw new DuplicateResourceException("An exam for this subject, date, and time already exists.");
+        if (examRepository.existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamType(
+                subject.getSubjectId(), request.getExamDate(), request.getExamTime(), examType)) {
+            throw new DuplicateResourceException("An exam for this subject, date, time, and type already exists.");
         }
 
         Exam exam = Exam.builder()
@@ -66,6 +72,7 @@ public class ExamService {
                 .examEndTime(request.getExamEndTime())
                 .roomNumber(request.getRoomNumber())
                 .building(request.getBuilding())
+                .examType(examType)
                 .subject(subject)
                 .build();
 
@@ -85,6 +92,7 @@ public class ExamService {
                 .subjectCode(savedExam.getSubject().getSubjectCode())
                 .subjectName(savedExam.getSubject().getSubjectName())
                 .building(savedExam.getBuilding())
+                .examType(savedExam.getExamType())
                 .build();
     }
 
@@ -104,6 +112,7 @@ public class ExamService {
                         .subjectCode(exam.getSubject().getSubjectCode())
                         .subjectName(exam.getSubject().getSubjectName())
                         .building(exam.getBuilding())
+                        .examType(exam.getExamType())
                         .build())
                 .toList();
     }
@@ -125,6 +134,7 @@ public class ExamService {
                 .subjectCode(exam.getSubject().getSubjectCode())
                 .building(exam.getBuilding())
                 .subjectId(exam.getSubject().getSubjectId())
+                .examType(exam.getExamType())
                 .build();
     }
 
@@ -137,13 +147,16 @@ public class ExamService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Exam not found"));
 
+        ExamType currentType = exam.getExamType() == null ? ExamType.REGULAR : exam.getExamType();
+        ExamType examType = request.getExamType() == null ? currentType : request.getExamType();
+
         Subject subject = subjectRepository.findById(request.getSubjectId())
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Subject not found"));
 
-        if (examRepository.existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamIdNot(
-                subject.getSubjectId(), request.getExamDate(), request.getExamTime(), id)) {
-            throw new DuplicateResourceException("An exam for this subject, date, and time already exists.");
+        if (examRepository.existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamTypeAndExamIdNot(
+                subject.getSubjectId(), request.getExamDate(), request.getExamTime(), examType, id)) {
+            throw new DuplicateResourceException("An exam for this subject, date, time, and type already exists.");
         }
 
         Exam candidate = Exam.builder()
@@ -153,6 +166,7 @@ public class ExamService {
                 .examEndTime(request.getExamEndTime())
                 .roomNumber(request.getRoomNumber())
                 .building(request.getBuilding())
+                .examType(examType)
                 .subject(subject)
                 .build();
         rejectScheduleConflicts(candidate, id);
@@ -162,6 +176,7 @@ public class ExamService {
         exam.setExamEndTime(request.getExamEndTime());
         exam.setRoomNumber(request.getRoomNumber());
         exam.setBuilding(request.getBuilding());
+        exam.setExamType(examType);
         exam.setSubject(subject);
 
         Exam updatedExam = examRepository.save(exam);
@@ -176,6 +191,7 @@ public class ExamService {
                 .subjectCode(updatedExam.getSubject().getSubjectCode())
                 .subjectName(updatedExam.getSubject().getSubjectName())
                 .building(updatedExam.getBuilding())
+                .examType(updatedExam.getExamType())
                 .build();
     }
 
@@ -199,12 +215,15 @@ public class ExamService {
     }
 
     // DELETE
+    @Transactional
     public void deleteExamById(Long id) {
 
         Exam exam = examRepository.findByIdWithSubject(id)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Exam not found"));
 
+        studentAbsenteeExamRepository.deleteByExam_ExamId(id);
+        studentAbsenteeExamRepository.flush();
         examRepository.delete(exam);
     }
 }

@@ -6,6 +6,7 @@ import com.manthan.campusexamscheduler.dto.ImportPreviewRow;
 import com.manthan.campusexamscheduler.dto.ImportRowError;
 import com.manthan.campusexamscheduler.dto.TimetableImportResponse;
 import com.manthan.campusexamscheduler.entity.Exam;
+import com.manthan.campusexamscheduler.entity.ExamType;
 import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.exception.ImportValidationException;
 import com.manthan.campusexamscheduler.repository.ExamRepository;
@@ -75,12 +76,22 @@ public class TimetableImportService {
 
     @Transactional(readOnly = true)
     public ImportPreviewResponse previewTimetable(MultipartFile file) {
-        return toPreview(analyzeTimetable(file));
+        return previewTimetable(file, ExamType.REGULAR);
+    }
+
+    @Transactional(readOnly = true)
+    public ImportPreviewResponse previewTimetable(MultipartFile file, ExamType examType) {
+        return toPreview(analyzeTimetable(file, examType));
     }
 
     @Transactional
     public TimetableImportResponse importTimetable(MultipartFile file) {
-        TimetableAnalysis analysis = analyzeTimetable(file);
+        return importTimetable(file, ExamType.REGULAR);
+    }
+
+    @Transactional
+    public TimetableImportResponse importTimetable(MultipartFile file, ExamType examType) {
+        TimetableAnalysis analysis = analyzeTimetable(file, examType);
         ImportPreviewResponse preview = toPreview(analysis);
         if (!preview.canImport()) {
             throw new ImportValidationException(preview);
@@ -95,10 +106,11 @@ public class TimetableImportService {
                 .build();
     }
 
-    private TimetableAnalysis analyzeTimetable(MultipartFile file) {
+    private TimetableAnalysis analyzeTimetable(MultipartFile file, ExamType examType) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Choose a non-empty timetable file.");
         }
+        ExamType resolvedExamType = examType == null ? ExamType.REGULAR : examType;
 
         String filename = Optional.ofNullable(file.getOriginalFilename()).orElse("").toLowerCase(Locale.ROOT);
         List<String[]> rows;
@@ -166,8 +178,10 @@ public class TimetableImportService {
                         throw new IllegalArgumentException("exam end time must be later than its start time");
                     }
                 }
-                String identity = subject.getSubjectId() + "|" + date + "|" + time;
-                if (!seenInFile.add(identity) || examRepository.existsBySubject_SubjectIdAndExamDateAndExamTime(subject.getSubjectId(), date, time)) {
+                String identity = subject.getSubjectId() + "|" + date + "|" + time + "|" + resolvedExamType;
+                if (!seenInFile.add(identity)
+                        || examRepository.existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamType(
+                                subject.getSubjectId(), date, time, resolvedExamType)) {
                     skippedDuplicates++;
                     continue;
                 }
@@ -178,6 +192,7 @@ public class TimetableImportService {
                         .examEndTime(endTime)
                         .building(building)
                         .roomNumber(room)
+                        .examType(resolvedExamType)
                         .build();
                 candidates.add(new ExamCandidate(rowNumber, exam));
             } catch (IllegalArgumentException exception) {
@@ -206,6 +221,7 @@ public class TimetableImportService {
                     Exam exam = candidate.exam();
                     Map<String, String> values = new LinkedHashMap<>();
                     values.put("Subject", exam.getSubject().getSubjectCode());
+                    values.put("Type", exam.getExamType().name());
                     values.put("Date", exam.getExamDate().toString());
                     values.put("Time", formatTimeRange(exam.getExamTime(), exam.getExamEndTime()));
                     values.put("Building", exam.getBuilding());

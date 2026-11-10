@@ -69,4 +69,43 @@ public class StudentController {
                 studentService.getStudentSchedule(enrollmentNumber)
         );
     }
+
+    @GetMapping("/{enrollmentNumber}/absentee-eligibility")
+    public ResponseEntity<List<StudentAbsenteeExamOptionResponse>> getMyAbsenteeExamOptions(
+            @PathVariable String enrollmentNumber) {
+
+        return ResponseEntity.ok(
+                studentService.getAbsenteeExamOptionsForEnrollment(enrollmentNumber)
+        );
+    }
+
+    @PutMapping("/{enrollmentNumber}/absentee-eligibility")
+    public ResponseEntity<List<StudentAbsenteeExamOptionResponse>> updateMyAbsenteeEligibility(
+            @PathVariable String enrollmentNumber,
+            @Valid @RequestBody StudentAbsenteeEligibilityRequest request) {
+
+        return ResponseEntity.ok(
+                studentService.updateAbsenteeEligibilityForEnrollment(
+                        enrollmentNumber,
+                        request.getExamIds()
+                )
+        );
+    }
+
+    @GetMapping("/{studentId}/absentee-exams")
+    public ResponseEntity<List<StudentAbsenteeExamOptionResponse>> getAbsenteeExamOptions(
+            @PathVariable Long studentId) {
+
+        return ResponseEntity.ok(studentService.getAbsenteeExamOptions(studentId));
+    }
+
+    @PutMapping("/{studentId}/absentee-exams")
+    public ResponseEntity<List<StudentAbsenteeExamOptionResponse>> updateAbsenteeEligibility(
+            @PathVariable Long studentId,
+            @Valid @RequestBody StudentAbsenteeEligibilityRequest request) {
+
+        return ResponseEntity.ok(
+                studentService.updateAbsenteeEligibility(studentId, request.getExamIds())
+        );
+    }
 }

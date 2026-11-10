@@ -15,8 +15,9 @@ import DownloadIcon from '@mui/icons-material/Download';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ExamCard from '../components/ExamCard';
 import Loading from '../components/Loading';
+import AbsenteeEligibilityDialog from '../components/AbsenteeEligibilityDialog';
 import api from '../services/api';
-import { downloadCalendar, getExamKey, readPersonalSchedule, removeExamFromPersonalSchedule, saveExamToPersonalSchedule } from '../utils/personalSchedule';
+import { downloadCalendar, getExamKey, reconcilePersonalSchedule, removeExamFromPersonalSchedule, saveExamToPersonalSchedule } from '../utils/personalSchedule';
 
 export default function SearchResult() {
   const { enrollmentNumber } = useParams();
@@ -24,6 +25,9 @@ export default function SearchResult() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedKeys, setSelectedKeys] = useState(new Set());
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [absenteeDialogOpen, setAbsenteeDialogOpen] = useState(false);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     const fetchSchedule = async () => {
@@ -34,10 +38,7 @@ export default function SearchResult() {
           `/api/students/${encodeURIComponent(enrollmentNumber)}/schedule`
         );
         setExams(response.data);
-        const currentEnrollment = String(enrollmentNumber || '').trim().toUpperCase();
-        const saved = readPersonalSchedule().filter(
-          (exam) => String(exam.enrollmentNumber || '').trim().toUpperCase() === currentEnrollment
-        );
+        const saved = reconcilePersonalSchedule(response.data, enrollmentNumber);
         setSelectedKeys(new Set(saved.map((exam) => getExamKey(exam, enrollmentNumber))));
       } catch (err) {
         if (err.response && err.response.status === 404) {
@@ -51,6 +52,10 @@ export default function SearchResult() {
     };
 
     fetchSchedule();
+  }, [enrollmentNumber, refreshToken]);
+
+  useEffect(() => {
+    setNotice('');
   }, [enrollmentNumber]);
 
   const toggleExam = (exam) => {
@@ -75,6 +80,8 @@ export default function SearchResult() {
     exams.forEach((exam) => removeExamFromPersonalSchedule(exam, enrollmentNumber));
     setSelectedKeys(new Set());
   };
+
+  const absenteeCount = exams.filter((exam) => exam.examType === 'ABSENTEE').length;
 
   if (loading) {
     return (
@@ -212,6 +219,11 @@ export default function SearchResult() {
             {/* Exam Results */}
             {!error && exams.length > 0 && (
               <>
+                {notice && (
+                  <Alert severity="success" onClose={() => setNotice('')} sx={{ mb: 2, borderRadius: 3 }}>
+                    {notice}
+                  </Alert>
+                )}
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}
                   spacing={2}
@@ -222,9 +234,25 @@ export default function SearchResult() {
                   }}
                 >
                   <Typography variant="h5" sx={{ fontWeight: 600, color: '#FFB300' }}>
-                    {exams.length} Exam{exams.length !== 1 ? 's' : ''} Found · {selectedKeys.size} in My Schedule
+                    {exams.length} Exam{exams.length !== 1 ? 's' : ''} Found{absenteeCount > 0 ? ` · ${absenteeCount} absentee` : ''} · {selectedKeys.size} in My Schedule
                   </Typography>
                   <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<EventBusyIcon />}
+                      onClick={() => setAbsenteeDialogOpen(true)}
+                      sx={{
+                        borderColor: 'rgba(255, 143, 0, 0.7)',
+                        color: '#FFB300',
+                        '&:hover': {
+                          borderColor: '#FF8F00',
+                          backgroundColor: 'rgba(230, 81, 0, 0.12)',
+                        },
+                      }}
+                    >
+                      I was absent
+                    </Button>
                     <Button size="small" onClick={selectAll}>Add all</Button>
                     <Button size="small" onClick={clearSelection} disabled={selectedKeys.size === 0}>Clear</Button>
                     <Button component={Link} to="/calendar" size="small" startIcon={<CalendarMonthIcon />}>My Schedule</Button>
@@ -246,6 +274,16 @@ export default function SearchResult() {
             )}
           </Container>
         </Box>
+        <AbsenteeEligibilityDialog
+          open={absenteeDialogOpen}
+          enrollmentNumber={enrollmentNumber}
+          selfService
+          onClose={() => setAbsenteeDialogOpen(false)}
+          onSaved={() => {
+            setRefreshToken((value) => value + 1);
+            setNotice('Absence preferences saved. Your schedule has been updated.');
+          }}
+        />
       </Box>
     </Fade>
   );

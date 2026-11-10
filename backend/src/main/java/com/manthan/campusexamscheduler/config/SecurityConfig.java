@@ -57,7 +57,13 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/api/students/*/schedule"
+                                "/api/students/*/schedule",
+                                "/api/students/*/absentee-eligibility"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/students/*/absentee-eligibility"
                         ).permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/exams/search").permitAll()

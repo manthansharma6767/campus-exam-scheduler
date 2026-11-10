@@ -42,6 +42,11 @@ public class Exam {
     @Column(nullable = false, length = 100)
     private String building;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "exam_type", nullable = false, length = 20)
+    @Builder.Default
+    private ExamType examType = ExamType.REGULAR;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subject_id", nullable = false)
     private Subject subject;

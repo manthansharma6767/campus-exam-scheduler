@@ -65,17 +65,29 @@ export default function ExamCard({ exam, selected = false, onToggle, enrollmentN
             <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3, color: '#FFFFFF' }}>
               {exam.subjectName}
             </Typography>
-            <Chip
-              label={exam.subjectCode}
-              size="small"
-              variant="outlined"
-              sx={{
-                mt: 0.5,
-                fontWeight: 600,
-                borderColor: '#FF8F00',
-                color: '#FFB300',
-              }}
-            />
+            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 0.5 }}>
+              <Chip
+                label={exam.subjectCode}
+                size="small"
+                variant="outlined"
+                sx={{
+                  fontWeight: 600,
+                  borderColor: '#FF8F00',
+                  color: '#FFB300',
+                }}
+              />
+              <Chip
+                label={exam.examType || 'REGULAR'}
+                size="small"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  backgroundColor: exam.examType === 'ABSENTEE' ? 'rgba(230, 81, 0, 0.18)' : 'rgba(255,255,255,0.06)',
+                  color: exam.examType === 'ABSENTEE' ? '#FFB300' : '#9E9E9E',
+                  border: exam.examType === 'ABSENTEE' ? '1px solid #FF8F00' : '1px solid rgba(255,255,255,0.12)',
+                }}
+              />
+            </Box>
           </Box>
         </Box>
 

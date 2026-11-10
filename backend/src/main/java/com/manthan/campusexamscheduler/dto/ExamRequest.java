@@ -1,5 +1,6 @@
 package com.manthan.campusexamscheduler.dto;
 
+import com.manthan.campusexamscheduler.entity.ExamType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -33,4 +34,6 @@ public class ExamRequest {
     @NotBlank
     @Size(max = 100)
     private String building;
+
+    private ExamType examType;
 }

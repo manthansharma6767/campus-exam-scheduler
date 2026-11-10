@@ -33,7 +33,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ImportPreviewPanel from '../components/ImportPreviewPanel';
 import api from '../services/api';
 
-const emptyForm = { examDate: '', examTime: '', examEndTime: '', roomNumber: '', subjectId: '', building: '' };
+const emptyForm = { examDate: '', examTime: '', examEndTime: '', roomNumber: '', subjectId: '', building: '', examType: 'REGULAR' };
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -68,6 +68,7 @@ export default function Exams() {
   const [importPreview, setImportPreview] = useState(null);
   const [importError, setImportError] = useState('');
   const [importAction, setImportAction] = useState('');
+  const [importExamType, setImportExamType] = useState('REGULAR');
 
   const fetchData = async () => {
     setLoading(true);
@@ -108,6 +109,7 @@ export default function Exams() {
       roomNumber: exam.roomNumber,
       subjectId: exam.subjectId,
       building: exam.building,
+      examType: exam.examType || 'REGULAR',
     });
     setFormError('');
     setDialogOpen(true);
@@ -135,6 +137,7 @@ export default function Exams() {
         roomNumber: form.roomNumber.trim(),
         subjectId: parseInt(form.subjectId, 10),
         building: form.building.trim(),
+        examType: form.examType || 'REGULAR',
       };
       if (editing) {
         await api.put(`/api/exams/${editing.examId}`, payload);
@@ -173,6 +176,7 @@ export default function Exams() {
     try {
       const body = new FormData();
       body.append('file', importFile);
+      body.append('examType', importExamType);
       const response = await api.post('/api/exams/import/preview', body);
       setImportPreview(response.data);
     } catch (err) {
@@ -192,11 +196,13 @@ export default function Exams() {
     try {
       const body = new FormData();
       body.append('file', importFile);
+      body.append('examType', importExamType);
       const response = await api.post('/api/exams/import', body);
       setSnackbar({ open: true, message: response.data.message, severity: 'success' });
       setImportDialogOpen(false);
       setImportFile(null);
       setImportPreview(null);
+      setImportExamType('REGULAR');
       fetchData();
     } catch (err) {
       if (err.response?.data?.errors || err.response?.data?.conflicts) setImportPreview(err.response.data);
@@ -213,16 +219,7 @@ export default function Exams() {
     setImportFile(null);
     setImportPreview(null);
     setImportError('');
-  };
-
-  const handleTimetableFileSelection = (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    setImportFile(file);
-    setImportPreview(null);
-    setImportError('');
-    setImportDialogOpen(true);
+    setImportExamType('REGULAR');
   };
 
   return (
@@ -246,10 +243,9 @@ export default function Exams() {
         <Box sx={{ background: '#1A1A1A', minHeight: '60vh' }}>
           <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
-              <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} disabled={importing}
+              <Button variant="outlined" startIcon={<UploadFileIcon />} disabled={importing} onClick={() => setImportDialogOpen(true)}
                 sx={{ borderColor: '#FF8F00', color: '#FFB300', '&:hover': { borderColor: '#FFB300' } }}>
                 {importing ? 'Importing...' : 'Import timetable'}
-                <input hidden type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleTimetableFileSelection} />
               </Button>
               <Button id="add-exam-button" variant="contained" startIcon={<AddIcon />} onClick={openAdd}
                 sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
@@ -274,6 +270,7 @@ export default function Exams() {
                   <TableHead>
                     <TableRow>
                       <TableCell>Subject</TableCell>
+                      <TableCell>Type</TableCell>
                       <TableCell>Date</TableCell>
                       <TableCell>Time</TableCell>
                       <TableCell>Building</TableCell>
@@ -289,6 +286,19 @@ export default function Exams() {
                             <Typography variant="body2" sx={{ fontWeight: 600 }}>{exam.subjectName}</Typography>
                             <Chip label={exam.subjectCode} size="small" variant="outlined" sx={{ mt: 0.5, borderColor: '#FF8F00', color: '#FFB300' }} />
                           </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={exam.examType || 'REGULAR'}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                              fontWeight: 700,
+                              borderColor: exam.examType === 'ABSENTEE' ? '#FF6D00' : 'rgba(255,255,255,0.25)',
+                              color: exam.examType === 'ABSENTEE' ? '#FFB300' : '#B0B0B0',
+                              backgroundColor: exam.examType === 'ABSENTEE' ? 'rgba(230, 81, 0, 0.12)' : 'transparent',
+                            }}
+                          />
                         </TableCell>
                         <TableCell>{formatDate(exam.examDate)}</TableCell>
                         <TableCell>{formatTime(exam.examTime)}{exam.examEndTime ? ` – ${formatTime(exam.examEndTime)}` : ''}</TableCell>
@@ -318,6 +328,22 @@ export default function Exams() {
             <Typography color="text.secondary" sx={{ mb: 2 }}>
               Review the parsed timetable and resolve validation errors or room/student schedule conflicts before saving. Scanned PDFs are processed with OCR and may take a little longer. Nothing is saved during preview.
             </Typography>
+            <TextField
+              select
+              size="small"
+              label="Exam type"
+              value={importExamType}
+              onChange={(event) => {
+                setImportExamType(event.target.value);
+                setImportPreview(null);
+                setImportError('');
+              }}
+              helperText="Absentee papers are kept separate from the regular timetable."
+              sx={{ minWidth: 200, mb: 2, display: 'flex' }}
+            >
+              <MenuItem value="REGULAR">Regular</MenuItem>
+              <MenuItem value="ABSENTEE">Absentee</MenuItem>
+            </TextField>
             <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} disabled={importing}>
               Choose PDF or Excel file
               <input hidden type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -358,6 +384,11 @@ export default function Exams() {
                     {s.subjectCode} — {s.subjectName}
                   </MenuItem>
                 ))}
+              </TextField>
+              <TextField name="examType" label="Exam Type" select value={form.examType} onChange={handleChange}
+                slotProps={{ htmlInput: { 'aria-label': 'Exam type' } }} fullWidth>
+                <MenuItem value="REGULAR">Regular</MenuItem>
+                <MenuItem value="ABSENTEE">Absentee</MenuItem>
               </TextField>
               <TextField name="examDate" label="Exam Date" type="date" value={form.examDate} onChange={handleChange}
                 slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Exam date' } }} fullWidth />

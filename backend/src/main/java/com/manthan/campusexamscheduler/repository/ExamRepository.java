@@ -2,6 +2,7 @@ package com.manthan.campusexamscheduler.repository;
 
 import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Exam;
+import com.manthan.campusexamscheduler.entity.ExamType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -35,12 +36,14 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
                 OR LOWER(e.roomNumber) LIKE CONCAT('%', LOWER(:query), '%'))
                 AND (:semester IS NULL OR s.semester = :semester)
                 AND (:examDate IS NULL OR e.examDate = :examDate)
+                AND (:examType IS NULL OR e.examType = :examType)
             ORDER BY e.examDate ASC, e.examTime ASC, s.subjectCode ASC
             """)
     List<Exam> searchPublicExams(
             @Param("query") String query,
             @Param("semester") Integer semester,
-            @Param("examDate") LocalDate examDate);
+            @Param("examDate") LocalDate examDate,
+            @Param("examType") ExamType examType);
 
     @Query("""
             SELECT e
@@ -51,15 +54,17 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
             """)
     Optional<Exam> findByIdWithSubject(@Param("id") Long id);
 
-    List<Exam> findBySubject_DepartmentAndSubject_SemesterOrderByExamDateAscExamTimeAsc(
+    List<Exam> findBySubject_DepartmentAndSubject_SemesterAndExamTypeOrderByExamDateAscExamTimeAsc(
             Department department,
-            Integer semester
+            Integer semester,
+            ExamType examType
     );
 
-    boolean existsBySubject_SubjectIdAndExamDateAndExamTime(Long subjectId, LocalDate examDate, LocalTime examTime);
+    boolean existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamType(
+            Long subjectId, LocalDate examDate, LocalTime examTime, ExamType examType);
 
-    boolean existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamIdNot(
-            Long subjectId, LocalDate examDate, LocalTime examTime, Long examId);
+    boolean existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamTypeAndExamIdNot(
+            Long subjectId, LocalDate examDate, LocalTime examTime, ExamType examType, Long examId);
 
     boolean existsByBuildingAndRoomNumberAndExamDateAndExamTime(
             String building, String roomNumber, LocalDate examDate, LocalTime examTime);

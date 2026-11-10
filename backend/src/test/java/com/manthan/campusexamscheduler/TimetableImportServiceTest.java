@@ -1,6 +1,7 @@
 package com.manthan.campusexamscheduler;
 
 import com.manthan.campusexamscheduler.entity.Exam;
+import com.manthan.campusexamscheduler.entity.ExamType;
 import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.repository.ExamRepository;
 import com.manthan.campusexamscheduler.repository.SubjectRepository;
@@ -257,7 +258,10 @@ class TimetableImportServiceTest {
             throw new UnsupportedOperationException(method);
         });
         ExamRepository examRepository = proxy(ExamRepository.class, (method, args) -> {
-            if (method.equals("existsBySubject_SubjectIdAndExamDateAndExamTime")) return false;
+            if (method.equals("existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamType")) {
+                assertEquals(ExamType.REGULAR, args[3]);
+                return false;
+            }
             if (method.equals("findAllWithSubject")) return new ArrayList<>(savedExams);
             if (method.equals("saveAll")) {
                 for (Object exam : (Iterable<?>) args[0]) savedExams.add((Exam) exam);
@@ -304,6 +308,39 @@ class TimetableImportServiceTest {
         assertEquals(LocalTime.of(9, 30), savedExams.get(2).getExamTime());
         assertEquals("Not assigned", savedExams.get(0).getBuilding());
         assertEquals("Not assigned", savedExams.get(0).getRoomNumber());
+    }
+
+    @Test
+    void importsAbsenteeTimetableRowsWithAbsenteeType() throws Exception {
+        Subject subject = Subject.builder().subjectId(7L).subjectCode("CS101").build();
+        List<Exam> savedExams = new ArrayList<>();
+        TimetableImportService timetableImportService = serviceFor(subject, savedExams, ExamType.ABSENTEE);
+
+        byte[] workbookBytes;
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("Absentee Exams");
+            String[] headers = { "Subject Code", "Date", "Time", "Building", "Room" };
+            var header = sheet.createRow(0);
+            for (int index = 0; index < headers.length; index++) header.createCell(index).setCellValue(headers[index]);
+
+            var row = sheet.createRow(1);
+            row.createCell(0).setCellValue("CS101");
+            row.createCell(1).setCellValue("2026-11-13");
+            row.createCell(2).setCellValue("11:00-12:00");
+            row.createCell(3).setCellValue("Not assigned");
+            row.createCell(4).setCellValue("Not assigned");
+            workbook.write(output);
+            workbookBytes = output.toByteArray();
+        }
+
+        var response = timetableImportService.importTimetable(
+                new MockMultipartFile("file", "absentee.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", workbookBytes),
+                ExamType.ABSENTEE);
+
+        assertEquals(1, response.getImported());
+        assertEquals(ExamType.ABSENTEE, savedExams.get(0).getExamType());
+        assertEquals(LocalTime.of(12, 0), savedExams.get(0).getExamEndTime());
     }
 
     @Test
@@ -355,12 +392,19 @@ class TimetableImportServiceTest {
     }
 
     private TimetableImportService serviceFor(Subject subject, List<Exam> savedExams) {
+        return serviceFor(subject, savedExams, ExamType.REGULAR);
+    }
+
+    private TimetableImportService serviceFor(Subject subject, List<Exam> savedExams, ExamType expectedType) {
         SubjectRepository subjectRepository = proxy(SubjectRepository.class, (method, args) -> {
             if (method.equals("findBySubjectCode")) return Optional.of(subject);
             throw new UnsupportedOperationException(method);
         });
         ExamRepository examRepository = proxy(ExamRepository.class, (method, args) -> {
-            if (method.equals("existsBySubject_SubjectIdAndExamDateAndExamTime")) return false;
+            if (method.equals("existsBySubject_SubjectIdAndExamDateAndExamTimeAndExamType")) {
+                assertEquals(expectedType, args[3]);
+                return false;
+            }
             if (method.equals("findAllWithSubject")) return new ArrayList<>(savedExams);
             if (method.equals("saveAll")) {
                 for (Object exam : (Iterable<?>) args[0]) savedExams.add((Exam) exam);

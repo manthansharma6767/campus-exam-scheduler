@@ -20,18 +20,6 @@ CREATE TABLE IF NOT EXISTS student_absentee_exams (
 ALTER TABLE student_absentee_exams
     ALTER COLUMN assigned_at SET DEFAULT (CURRENT_TIMESTAMP);
 
--- Live data: A2-22 was absent for Cloud Computing only.
--- All other regular papers remain visible through the cohort schedule.
-INSERT INTO student_absentee_exams (student_id, exam_id, assigned_at)
-SELECT st.student_id, e.exam_id, CURRENT_TIMESTAMP
-FROM students st
-JOIN exams e ON e.exam_type = 'ABSENTEE'
-JOIN subjects sub ON sub.subject_id = e.subject_id
-WHERE UPPER(st.enrollment_number) = UPPER('A2-22')
-  AND sub.subject_code = '24CS01TH0503'
-  AND NOT EXISTS (
-      SELECT 1
-      FROM student_absentee_exams sae
-      WHERE sae.student_id = st.student_id
-        AND sae.exam_id = e.exam_id
-  );
+-- Historical note: this migration used to seed one live A2-22 mapping. That
+-- seed has been removed so schema migrations never insert environment data.
+-- Flyway now owns schema changes under backend/src/main/resources/db/migration.

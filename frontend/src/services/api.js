@@ -12,10 +12,12 @@ const api = axios.create({
 // Public endpoints that do NOT require authentication
 const PUBLIC_PATTERNS = [
   /^\/api\/students\/[^/]+\/schedule$/,
+  /^\/api\/students\/[^/]+\/absentee-eligibility$/,
+  /^\/api\/students\/[^/]+\/verify$/,
   /^\/api\/exams\/search$/,
   /^\/api\/seating\/plans\/?$/,
   /^\/api\/seating\/plans\/\d+\/roll\/[^/]+$/,
-  /^\/api\/auth\//,  // covers /api/auth/login and /api/auth/register
+  /^\/api\/auth\/(login|register)$/,
 ];
 
 
@@ -50,7 +52,9 @@ api.interceptors.response.use(
       !isPublicEndpoint(error.config?.url)
     ) {
       localStorage.removeItem('token');
-      window.location.href = '/admin/login';
+      if (window.location.pathname !== '/admin/login') {
+        window.location.href = '/admin/login';
+      }
     }
     return Promise.reject(error);
   }

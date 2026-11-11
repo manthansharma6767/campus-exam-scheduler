@@ -4,6 +4,7 @@ import com.manthan.campusexamscheduler.dto.StudentAbsenteeExamOptionResponse;
 import com.manthan.campusexamscheduler.dto.StudentRequest;
 import com.manthan.campusexamscheduler.dto.StudentResponse;
 import com.manthan.campusexamscheduler.dto.StudentScheduleResponse;
+import com.manthan.campusexamscheduler.entity.AbsenteeAssignmentSource;
 import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Exam;
 import com.manthan.campusexamscheduler.entity.ExamType;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,6 +67,7 @@ public class StudentService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .enrollmentNumber(request.getEnrollmentNumber())
                 .semester(request.getSemester())
+                .dateOfBirth(request.getDateOfBirth())
                 .department(department)
                 .build();
 
@@ -78,6 +81,7 @@ public class StudentService {
                 .semester(savedStudent.getSemester())
                 .departmentId(savedStudent.getDepartment().getDepartmentId())
                 .departmentName(savedStudent.getDepartment().getDepartmentName())
+                .dateOfBirth(savedStudent.getDateOfBirth())
                 .build();
     }
 
@@ -96,6 +100,7 @@ public class StudentService {
                         .semester(student.getSemester())
                         .departmentId(student.getDepartment().getDepartmentId())
                         .departmentName(student.getDepartment().getDepartmentName())
+                        .dateOfBirth(student.getDateOfBirth())
                         .build())
                 .toList();
     }
@@ -116,6 +121,7 @@ public class StudentService {
                 .semester(student.getSemester())
                 .departmentId(student.getDepartment().getDepartmentId())
                 .departmentName(student.getDepartment().getDepartmentName())
+                .dateOfBirth(student.getDateOfBirth())
                 .build();
     }
 
@@ -149,8 +155,13 @@ public class StudentService {
         student.setEnrollmentNumber(request.getEnrollmentNumber());
         student.setSemester(request.getSemester());
         student.setDepartment(department);
+        // Omitted DOB values preserve whatever the administrator previously set.
+        if (request.getDateOfBirth() != null) {
+            student.setDateOfBirth(request.getDateOfBirth());
+        }
 
         Student updatedStudent = studentRepository.save(student);
+        cleanupStaleAbsenteeMappings(updatedStudent);
 
         return StudentResponse.builder()
                 .studentId(updatedStudent.getStudentId())
@@ -160,6 +171,7 @@ public class StudentService {
                 .semester(updatedStudent.getSemester())
                 .departmentId(updatedStudent.getDepartment().getDepartmentId())
                 .departmentName(updatedStudent.getDepartment().getDepartmentName())
+                .dateOfBirth(updatedStudent.getDateOfBirth())
                 .build();
     }
 
@@ -181,54 +193,49 @@ public class StudentService {
     public List<StudentAbsenteeExamOptionResponse> getAbsenteeExamOptions(Long studentId) {
 
         Student student = findStudent(studentId);
-        List<Exam> exams = examRepository
-                .findBySubject_DepartmentAndSubject_SemesterAndExamTypeOrderByExamDateAscExamTimeAsc(
-                        student.getDepartment(),
-                        student.getSemester(),
-                        ExamType.ABSENTEE
-                );
-        Set<Long> assignedExamIds = new HashSet<>(
-                studentAbsenteeExamRepository.findExamIdsByStudentId(studentId)
-        );
-
-        return exams.stream()
-                .map(exam -> toAbsenteeExamOption(exam, assignedExamIds.contains(exam.getExamId())))
-                .toList();
+        return buildAbsenteeExamOptions(student);
     }
 
     @Transactional(readOnly = true)
     public List<StudentAbsenteeExamOptionResponse> getAbsenteeExamOptionsForEnrollment(
             String enrollmentNumber) {
 
-        return getAbsenteeExamOptions(findStudentByEnrollment(enrollmentNumber).getStudentId());
+        return buildAbsenteeExamOptions(findStudentByEnrollment(enrollmentNumber));
     }
 
+    /**
+     * Student self-service save. All locked mappings are preserved, even if the
+     * student omits them from the request. Unlocked mappings may be removed or
+     * added freely.
+     */
     @Transactional
     public List<StudentAbsenteeExamOptionResponse> updateAbsenteeEligibilityForEnrollment(
             String enrollmentNumber,
             List<Long> examIds) {
 
-        return updateAbsenteeEligibility(
-                findStudentByEnrollment(enrollmentNumber).getStudentId(),
-                examIds
-        );
+        Student student = findStudentByEnrollment(enrollmentNumber);
+        return updateStudentAbsenteeEligibility(student, examIds);
     }
 
+    /**
+     * Admin save. The submitted set replaces the student's complete mapping set
+     * and the submitted lock list controls which rows students cannot remove.
+     */
     @Transactional
     public List<StudentAbsenteeExamOptionResponse> updateAbsenteeEligibility(
             Long studentId,
-            List<Long> examIds) {
+            List<Long> examIds,
+            List<Long> lockedExamIds,
+            String updatedBy) {
 
         Student student = findStudent(studentId);
-        List<Long> requestedExamIds = examIds == null
-                ? List.of()
-                : examIds.stream().filter(Objects::nonNull).distinct().toList();
+        Set<Long> requestedExamIds = new LinkedHashSet<>(normalizeExamIds(examIds));
+        Set<Long> requestedLockedExamIds = new HashSet<>(normalizeExamIds(lockedExamIds));
 
         List<Exam> requestedExams = examRepository.findAllById(requestedExamIds);
         if (requestedExams.size() != requestedExamIds.size()) {
             throw new ResourceNotFoundException("One or more absentee exams were not found.");
         }
-
         for (Exam exam : requestedExams) {
             validateAbsenteeExamForStudent(exam, student);
         }
@@ -248,15 +255,142 @@ public class StudentService {
         studentAbsenteeExamRepository.deleteAll(mappingsToRemove);
 
         for (Exam exam : requestedExams) {
-            if (!existingByExamId.containsKey(exam.getExamId())) {
+            StudentAbsenteeExam mapping = existingByExamId.get(exam.getExamId());
+            boolean locked = requestedLockedExamIds.contains(exam.getExamId());
+            if (mapping == null) {
                 studentAbsenteeExamRepository.save(StudentAbsenteeExam.builder()
                         .student(student)
                         .exam(exam)
+                        .source(AbsenteeAssignmentSource.ADMIN)
+                        .locked(locked)
+                        .updatedBy(updatedBy)
                         .build());
+            } else {
+                mapping.setSource(AbsenteeAssignmentSource.ADMIN);
+                mapping.setLocked(locked);
+                mapping.setUpdatedBy(updatedBy);
+                studentAbsenteeExamRepository.save(mapping);
             }
         }
 
-        return getAbsenteeExamOptions(studentId);
+        studentAbsenteeExamRepository.flush();
+        return buildAbsenteeExamOptions(student);
+    }
+
+    /**
+     * Backward-compatible admin entry point: replaces the set without changing
+     * the protected status of retained rows.
+     */
+    @Transactional
+    public List<StudentAbsenteeExamOptionResponse> updateAbsenteeEligibility(
+            Long studentId,
+            List<Long> examIds) {
+
+        Set<Long> lockedExamIds = studentAbsenteeExamRepository.findByStudent_StudentId(studentId)
+                .stream()
+                .filter(StudentAbsenteeExam::isLocked)
+                .map(mapping -> mapping.getExam().getExamId())
+                .collect(Collectors.toSet());
+        return updateAbsenteeEligibility(studentId, examIds, List.copyOf(lockedExamIds), "admin");
+    }
+
+    private List<StudentAbsenteeExamOptionResponse> updateStudentAbsenteeEligibility(
+            Student student,
+            List<Long> examIds) {
+
+        Set<Long> requestedExamIds = new LinkedHashSet<>(normalizeExamIds(examIds));
+        Map<Long, StudentAbsenteeExam> existingByExamId =
+                studentAbsenteeExamRepository.findByStudent_StudentId(student.getStudentId())
+                        .stream()
+                        .collect(Collectors.toMap(
+                                mapping -> mapping.getExam().getExamId(),
+                                Function.identity()
+                        ));
+
+        Set<Long> finalExamIds = new LinkedHashSet<>(requestedExamIds);
+        existingByExamId.values().stream()
+                .filter(StudentAbsenteeExam::isLocked)
+                .map(mapping -> mapping.getExam().getExamId())
+                .forEach(finalExamIds::add);
+
+        List<Exam> requestedExams = examRepository.findAllById(finalExamIds);
+        if (requestedExams.size() != finalExamIds.size()) {
+            throw new ResourceNotFoundException("One or more absentee exams were not found.");
+        }
+        for (Exam exam : requestedExams) {
+            validateAbsenteeExamForStudent(exam, student);
+        }
+
+        List<StudentAbsenteeExam> mappingsToRemove = existingByExamId.entrySet().stream()
+                .filter(entry -> !finalExamIds.contains(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .toList();
+        studentAbsenteeExamRepository.deleteAll(mappingsToRemove);
+
+        for (Exam exam : requestedExams) {
+            StudentAbsenteeExam mapping = existingByExamId.get(exam.getExamId());
+            if (mapping == null) {
+                studentAbsenteeExamRepository.save(StudentAbsenteeExam.builder()
+                        .student(student)
+                        .exam(exam)
+                        .source(AbsenteeAssignmentSource.STUDENT)
+                        .locked(false)
+                        .updatedBy(student.getEnrollmentNumber())
+                        .build());
+            } else if (!mapping.isLocked()) {
+                mapping.setSource(AbsenteeAssignmentSource.STUDENT);
+                mapping.setUpdatedBy(student.getEnrollmentNumber());
+                studentAbsenteeExamRepository.save(mapping);
+            }
+        }
+
+        studentAbsenteeExamRepository.flush();
+        return buildAbsenteeExamOptions(student);
+    }
+
+    private List<StudentAbsenteeExamOptionResponse> buildAbsenteeExamOptions(Student student) {
+
+        List<Exam> exams = examRepository
+                .findBySubject_DepartmentAndSubject_SemesterAndExamTypeOrderByExamDateAscExamTimeAsc(
+                        student.getDepartment(),
+                        student.getSemester(),
+                        ExamType.ABSENTEE
+                );
+        Map<Long, StudentAbsenteeExam> mappingsByExamId =
+                studentAbsenteeExamRepository.findByStudent_StudentId(student.getStudentId())
+                        .stream()
+                        .collect(Collectors.toMap(
+                                mapping -> mapping.getExam().getExamId(),
+                                Function.identity()
+                        ));
+
+        return exams.stream()
+                .map(exam -> toAbsenteeExamOption(exam, mappingsByExamId.get(exam.getExamId())))
+                .toList();
+    }
+
+    private void cleanupStaleAbsenteeMappings(Student student) {
+        List<StudentAbsenteeExam> staleMappings =
+                studentAbsenteeExamRepository.findByStudent_StudentId(student.getStudentId())
+                        .stream()
+                        .filter(mapping -> !matchesStudentCohort(mapping.getExam(), student))
+                        .toList();
+        if (!staleMappings.isEmpty()) {
+            studentAbsenteeExamRepository.deleteAll(staleMappings);
+        }
+    }
+
+    private boolean matchesStudentCohort(Exam exam, Student student) {
+        return exam.getExamType() == ExamType.ABSENTEE
+                && exam.getSubject().getDepartment().getDepartmentId()
+                        .equals(student.getDepartment().getDepartmentId())
+                && exam.getSubject().getSemester().equals(student.getSemester());
+    }
+
+    private List<Long> normalizeExamIds(List<Long> examIds) {
+        return examIds == null
+                ? List.of()
+                : examIds.stream().filter(Objects::nonNull).distinct().toList();
     }
 
     // Student Schedule
@@ -311,7 +445,7 @@ public class StudentService {
     }
 
     private Student findStudentByEnrollment(String enrollmentNumber) {
-        return studentRepository.findByEnrollmentNumber(enrollmentNumber)
+        return studentRepository.findByEnrollmentNumberIgnoreCase(enrollmentNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
     }
 
@@ -327,7 +461,9 @@ public class StudentService {
         }
     }
 
-    private StudentAbsenteeExamOptionResponse toAbsenteeExamOption(Exam exam, boolean assigned) {
+    private StudentAbsenteeExamOptionResponse toAbsenteeExamOption(
+            Exam exam,
+            StudentAbsenteeExam mapping) {
         return StudentAbsenteeExamOptionResponse.builder()
                 .examId(exam.getExamId())
                 .subjectCode(exam.getSubject().getSubjectCode())
@@ -338,7 +474,11 @@ public class StudentService {
                 .building(exam.getBuilding())
                 .roomNumber(exam.getRoomNumber())
                 .examType(exam.getExamType())
-                .assigned(assigned)
+                .assigned(mapping != null)
+                .locked(mapping != null && mapping.isLocked())
+                .source(mapping == null ? null : mapping.getSource())
+                .updatedAt(mapping == null ? null : mapping.getUpdatedAt())
+                .updatedBy(mapping == null ? null : mapping.getUpdatedBy())
                 .build();
     }
 }

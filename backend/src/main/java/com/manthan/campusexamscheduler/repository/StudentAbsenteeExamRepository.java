@@ -15,6 +15,8 @@ public interface StudentAbsenteeExamRepository extends JpaRepository<StudentAbse
 
     List<StudentAbsenteeExam> findByStudent_StudentId(Long studentId);
 
+    List<StudentAbsenteeExam> findByExam_ExamId(Long examId);
+
     void deleteByStudent_StudentId(Long studentId);
 
     void deleteByExam_ExamId(Long examId);

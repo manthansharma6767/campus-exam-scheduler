@@ -20,6 +20,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service
@@ -56,6 +59,7 @@ public class StudentImportService {
                         .password(passwordEncoder.encode(candidate.password()))
                         .enrollmentNumber(candidate.enrollmentNumber())
                         .semester(candidate.semester())
+                        .dateOfBirth(candidate.dateOfBirth())
                         .department(candidate.department())
                         .build())
                 .toList();
@@ -115,6 +119,8 @@ public class StudentImportService {
                 String password = cell(row, columns, "password");
                 String enrollmentNumber = cell(row, columns, "enrollmentNumber").trim().toUpperCase(Locale.ROOT);
                 String semesterText = cell(row, columns, "semester").trim();
+                LocalDate dateOfBirth = parseDateOfBirth(
+                        cell(row, columns, "dateOfBirth").trim());
 
                 validateStudentFields(name, email, password, enrollmentNumber, semesterText);
                 Department department = resolveDepartment(row, columns);
@@ -131,7 +137,7 @@ public class StudentImportService {
                 fileEmails.add(email);
                 fileEnrollmentNumbers.add(enrollmentNumber);
                 candidates.add(new StudentCandidate(rowNumber, name, email, password,
-                        enrollmentNumber, semester, department));
+                        enrollmentNumber, semester, dateOfBirth, department));
             } catch (IllegalArgumentException exception) {
                 errors.add(new ImportRowError(rowNumber, exception.getMessage()));
             }
@@ -149,6 +155,9 @@ public class StudentImportService {
                     values.put("Email", candidate.email());
                     values.put("Roll Number", candidate.enrollmentNumber());
                     values.put("Semester", String.valueOf(candidate.semester()));
+                    if (candidate.dateOfBirth() != null) {
+                        values.put("Date of Birth", candidate.dateOfBirth().toString());
+                    }
                     values.put("Department", candidate.department().getDepartmentName());
                     return new ImportPreviewRow(candidate.rowNumber(), values);
                 })
@@ -175,7 +184,8 @@ public class StudentImportService {
     }
 
     private record StudentCandidate(int rowNumber, String name, String email, String password,
-                                    String enrollmentNumber, int semester, Department department) { }
+                                    String enrollmentNumber, int semester, LocalDate dateOfBirth,
+                                    Department department) { }
     private record StudentAnalysis(List<StudentCandidate> candidates, int skippedDuplicates,
                                    List<ImportRowError> errors, List<ImportPreviewRow> previewRows) { }
 
@@ -202,6 +212,31 @@ public class StudentImportService {
         if (semester < 1 || semester > 8) {
             throw new IllegalArgumentException("semester must be a number from 1 to 8");
         }
+    }
+
+    private LocalDate parseDateOfBirth(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        List<DateTimeFormatter> formats = List.of(
+                DateTimeFormatter.ISO_LOCAL_DATE,
+                DateTimeFormatter.ofPattern("d-M-uuuu"),
+                DateTimeFormatter.ofPattern("d/M/uuuu"),
+                DateTimeFormatter.ofPattern("uuuu/M/d")
+        );
+        for (DateTimeFormatter format : formats) {
+            try {
+                LocalDate date = LocalDate.parse(value, format);
+                if (date.isAfter(LocalDate.now())) {
+                    throw new IllegalArgumentException("date of birth cannot be in the future");
+                }
+                return date;
+            } catch (DateTimeParseException ignored) {
+                // Try the next supported format.
+            }
+        }
+        throw new IllegalArgumentException(
+                "date of birth must be a valid date such as 2005-08-24");
     }
 
     private Department resolveDepartment(String[] row, Map<String, Integer> columns) {
@@ -234,7 +269,13 @@ public class StudentImportService {
                 String[] values = new String[width];
                 for (int column = 0; column < width; column++) {
                     Cell cell = row.getCell(column, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                    values[column] = cell == null ? "" : formatter.formatCellValue(cell).trim();
+                    if (cell != null && cell.getCellType() == CellType.NUMERIC
+                            && DateUtil.isCellDateFormatted(cell)) {
+                        LocalDate date = cell.getLocalDateTimeCellValue().toLocalDate();
+                        values[column] = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+                    } else {
+                        values[column] = cell == null ? "" : formatter.formatCellValue(cell).trim();
+                    }
                 }
                 rows.add(values);
             }
@@ -307,6 +348,7 @@ public class StudentImportService {
                 case "password", "initialpassword" -> "password";
                 case "roll", "rollno", "rollnumber", "enrollment", "enrollmentno", "enrollmentnumber", "registrationnumber", "registrationno" -> "enrollmentNumber";
                 case "semester", "sem" -> "semester";
+                case "dateofbirth", "dob", "birthdate", "birthday" -> "dateOfBirth";
                 case "department", "departmentname", "dept", "deptname" -> "departmentName";
                 case "departmentid", "deptid" -> "departmentId";
                 default -> null;

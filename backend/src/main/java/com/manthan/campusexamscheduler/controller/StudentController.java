@@ -3,11 +3,13 @@ package com.manthan.campusexamscheduler.controller;
 import com.manthan.campusexamscheduler.dto.*;
 import com.manthan.campusexamscheduler.service.StudentService;
 import com.manthan.campusexamscheduler.service.StudentImportService;
+import com.manthan.campusexamscheduler.service.StudentVerificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,6 +22,7 @@ public class StudentController {
 
     private final StudentService studentService;
     private final StudentImportService studentImportService;
+    private final StudentVerificationService studentVerificationService;
 
     @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ImportPreviewResponse> previewStudents(@RequestPart("file") MultipartFile file) {
@@ -61,6 +64,17 @@ public class StudentController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{enrollmentNumber}/verify")
+    public ResponseEntity<StudentVerificationResponse> verifyStudent(
+            @PathVariable String enrollmentNumber,
+            @Valid @RequestBody StudentVerificationRequest request) {
+
+        return ResponseEntity.ok(studentVerificationService.verify(
+                enrollmentNumber,
+                request.getDateOfBirth()
+        ));
+    }
+
     @GetMapping("/{enrollmentNumber}/schedule")
     public ResponseEntity<List<StudentScheduleResponse>> getStudentSchedule(
             @PathVariable String enrollmentNumber) {
@@ -72,8 +86,11 @@ public class StudentController {
 
     @GetMapping("/{enrollmentNumber}/absentee-eligibility")
     public ResponseEntity<List<StudentAbsenteeExamOptionResponse>> getMyAbsenteeExamOptions(
-            @PathVariable String enrollmentNumber) {
+            @PathVariable String enrollmentNumber,
+            @RequestHeader(value = "X-Student-Verification", required = false)
+            String verificationToken) {
 
+        studentVerificationService.requireVerifiedEnrollment(enrollmentNumber, verificationToken);
         return ResponseEntity.ok(
                 studentService.getAbsenteeExamOptionsForEnrollment(enrollmentNumber)
         );
@@ -82,11 +99,15 @@ public class StudentController {
     @PutMapping("/{enrollmentNumber}/absentee-eligibility")
     public ResponseEntity<List<StudentAbsenteeExamOptionResponse>> updateMyAbsenteeEligibility(
             @PathVariable String enrollmentNumber,
+            @RequestHeader(value = "X-Student-Verification", required = false)
+            String verificationToken,
             @Valid @RequestBody StudentAbsenteeEligibilityRequest request) {
 
+        String verifiedEnrollment = studentVerificationService
+                .requireVerifiedEnrollment(enrollmentNumber, verificationToken);
         return ResponseEntity.ok(
                 studentService.updateAbsenteeEligibilityForEnrollment(
-                        enrollmentNumber,
+                        verifiedEnrollment,
                         request.getExamIds()
                 )
         );
@@ -102,10 +123,16 @@ public class StudentController {
     @PutMapping("/{studentId}/absentee-exams")
     public ResponseEntity<List<StudentAbsenteeExamOptionResponse>> updateAbsenteeEligibility(
             @PathVariable Long studentId,
-            @Valid @RequestBody StudentAbsenteeEligibilityRequest request) {
+            @Valid @RequestBody StudentAbsenteeEligibilityRequest request,
+            Authentication authentication) {
 
         return ResponseEntity.ok(
-                studentService.updateAbsenteeEligibility(studentId, request.getExamIds())
+                studentService.updateAbsenteeEligibility(
+                        studentId,
+                        request.getExamIds(),
+                        request.getLockedExamIds(),
+                        authentication == null ? "admin" : authentication.getName()
+                )
         );
     }
 }

@@ -2,6 +2,8 @@ package com.manthan.campusexamscheduler.dto;
 
 import lombok.*;
 
+import java.time.LocalDate;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,5 +24,7 @@ public class StudentResponse {
     private Long departmentId;
 
     private String departmentName;
+
+    private LocalDate dateOfBirth;
 
 }

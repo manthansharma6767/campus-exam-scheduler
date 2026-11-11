@@ -3,6 +3,7 @@ import com.manthan.campusexamscheduler.dto.ExamRequest;
 import com.manthan.campusexamscheduler.dto.ExamResponse;
 import com.manthan.campusexamscheduler.entity.Exam;
 import com.manthan.campusexamscheduler.entity.ExamType;
+import com.manthan.campusexamscheduler.entity.StudentAbsenteeExam;
 import com.manthan.campusexamscheduler.entity.Subject;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
@@ -180,6 +181,7 @@ public class ExamService {
         exam.setSubject(subject);
 
         Exam updatedExam = examRepository.save(exam);
+        cleanupStaleAbsenteeMappings(updatedExam);
 
         return ExamResponse.builder()
                 .examId(updatedExam.getExamId())
@@ -193,6 +195,29 @@ public class ExamService {
                 .building(updatedExam.getBuilding())
                 .examType(updatedExam.getExamType())
                 .build();
+    }
+
+    private void cleanupStaleAbsenteeMappings(Exam exam) {
+        if (exam.getExamType() != ExamType.ABSENTEE) {
+            studentAbsenteeExamRepository.deleteByExam_ExamId(exam.getExamId());
+            studentAbsenteeExamRepository.flush();
+            return;
+        }
+
+        List<StudentAbsenteeExam> staleMappings =
+                studentAbsenteeExamRepository.findByExam_ExamId(exam.getExamId())
+                        .stream()
+                        .filter(mapping -> {
+                            var student = mapping.getStudent();
+                            return !exam.getSubject().getDepartment().getDepartmentId()
+                                    .equals(student.getDepartment().getDepartmentId())
+                                    || !exam.getSubject().getSemester().equals(student.getSemester());
+                        })
+                        .toList();
+        if (!staleMappings.isEmpty()) {
+            studentAbsenteeExamRepository.deleteAll(staleMappings);
+            studentAbsenteeExamRepository.flush();
+        }
     }
 
     private void rejectScheduleConflicts(Exam candidate, Long ignoredExamId) {

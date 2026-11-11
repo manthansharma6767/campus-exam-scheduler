@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "students")
 @Getter
@@ -47,6 +49,14 @@ public class Student {
     @Max(8)
     @Column(nullable = false)
     private Integer semester;
+
+    /**
+     * Optional for existing records, but required before a student can use
+     * enrollment + date-of-birth self-service verification.
+     */
+    @Past
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", nullable = false)

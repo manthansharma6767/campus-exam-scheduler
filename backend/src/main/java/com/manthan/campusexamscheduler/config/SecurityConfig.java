@@ -53,7 +53,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         // Public APIs
-                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/students/*/verify"
+                        ).permitAll()
 
                         .requestMatchers(
                                 HttpMethod.GET,

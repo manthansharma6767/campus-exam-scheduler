@@ -8,6 +8,7 @@ import com.manthan.campusexamscheduler.repository.AdministratorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -94,5 +95,24 @@ public class AdministratorService {
                 .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
 
         administratorRepository.delete(admin);
+    }
+
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+        Administrator administrator = administratorRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Administrator not found"));
+
+        // A wrong current password is an in-session validation failure, not a
+        // stale JWT, so it returns 400 instead of triggering a login redirect.
+        if (!passwordEncoder.matches(request.getCurrentPassword(), administrator.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect.");
+        }
+        if (passwordEncoder.matches(request.getNewPassword(), administrator.getPassword())) {
+            throw new IllegalArgumentException(
+                    "New password must be different from the current password.");
+        }
+
+        administrator.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        administratorRepository.save(administrator);
     }
 }

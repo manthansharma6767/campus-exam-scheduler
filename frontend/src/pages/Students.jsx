@@ -35,7 +35,7 @@ import ImportPreviewPanel from '../components/ImportPreviewPanel';
 import AbsenteeEligibilityDialog from '../components/AbsenteeEligibilityDialog';
 import api from '../services/api';
 
-const emptyForm = { name: '', email: '', password: '', enrollmentNumber: '', semester: '', departmentId: '' };
+const emptyForm = { name: '', email: '', password: '', enrollmentNumber: '', semester: '', departmentId: '', dateOfBirth: '' };
 
 export default function Students() {
   const [students, setStudents] = useState([]);
@@ -96,6 +96,7 @@ export default function Students() {
       enrollmentNumber: student.enrollmentNumber,
       semester: student.semester,
       departmentId: student.departmentId,
+      dateOfBirth: student.dateOfBirth || '',
     });
     setFormError('');
     setDialogOpen(true);
@@ -115,6 +116,9 @@ export default function Students() {
     if (!form.enrollmentNumber.trim()) return 'Enrollment number is required';
     if (!form.semester) return 'Semester is required';
     if (!form.departmentId) return 'Department is required';
+    if (form.dateOfBirth && form.dateOfBirth > new Date().toISOString().slice(0, 10)) {
+      return 'Date of birth cannot be in the future';
+    }
     return null;
   };
 
@@ -129,6 +133,7 @@ export default function Students() {
         enrollmentNumber: form.enrollmentNumber.trim(),
         semester: parseInt(form.semester, 10),
         departmentId: parseInt(form.departmentId, 10),
+        dateOfBirth: form.dateOfBirth || null,
       };
       // Only send password if provided (required on create, optional on edit)
       if (form.password.trim()) {
@@ -168,7 +173,7 @@ export default function Students() {
 
   const downloadStudentTemplate = () => {
     const template = new Blob(
-      ['Name,Email,Password,Roll Number,Semester,Department\r\n'],
+      ['Name,Email,Password,Roll Number,Semester,Date of Birth,Department\r\n'],
       { type: 'text/csv;charset=utf-8' }
     );
     const url = URL.createObjectURL(template);
@@ -273,13 +278,14 @@ export default function Students() {
               </Box>
             ) : (
               <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3, overflowX: 'auto', backgroundColor: '#242424' }}>
-                <Table aria-label="Students table" sx={{ minWidth: 700 }}>
+                <Table aria-label="Students table" sx={{ minWidth: 860 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Name</TableCell>
                       <TableCell>Email</TableCell>
                       <TableCell>Enrollment No.</TableCell>
                       <TableCell>Semester</TableCell>
+                      <TableCell>Date of Birth</TableCell>
                       <TableCell>Department</TableCell>
                       <TableCell align="right">Actions</TableCell>
                     </TableRow>
@@ -291,6 +297,7 @@ export default function Students() {
                         <TableCell>{stu.email}</TableCell>
                         <TableCell sx={{ color: '#FFB300', fontWeight: 500 }}>{stu.enrollmentNumber}</TableCell>
                         <TableCell>{stu.semester}</TableCell>
+                        <TableCell>{stu.dateOfBirth || '—'}</TableCell>
                         <TableCell>{stu.departmentName}</TableCell>
                         <TableCell align="right">
                           <Tooltip title="Manage absentee papers">
@@ -319,7 +326,7 @@ export default function Students() {
           <DialogContent>
             {importError && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{importError}</Alert>}
             <Typography sx={{ color: 'text.secondary', mb: 2 }}>
-              Upload a CSV, XLS, or XLSX file. Include each student’s name, email, initial password, roll/enrollment number, semester, and an existing department name or ID.
+              Upload a CSV, XLS, or XLSX file. Include each student’s name, email, initial password, roll/enrollment number, semester, optional date of birth (YYYY-MM-DD), and an existing department name or ID.
             </Typography>
             <Button onClick={downloadStudentTemplate} sx={{ mb: 2, px: 0 }}>
               Download CSV template
@@ -385,6 +392,12 @@ export default function Students() {
                 slotProps={{ htmlInput: { 'aria-label': 'Password', maxLength: 72, minLength: 8 } }} fullWidth />
               <TextField name="enrollmentNumber" label="Enrollment Number" value={form.enrollmentNumber} onChange={handleChange}
                 placeholder="e.g. RBU2024001" slotProps={{ htmlInput: { 'aria-label': 'Enrollment number', maxLength: 255 } }} fullWidth />
+              <TextField name="dateOfBirth" label="Date of Birth" type="date" value={form.dateOfBirth} onChange={handleChange}
+                helperText="Used with the enrollment number for self-service verification"
+                slotProps={{
+                  inputLabel: { shrink: true },
+                  htmlInput: { 'aria-label': 'Date of birth', max: new Date().toISOString().slice(0, 10) },
+                }} fullWidth />
               <TextField name="semester" label="Semester" select value={form.semester} onChange={handleChange}
                 slotProps={{ htmlInput: { 'aria-label': 'Semester' } }} fullWidth>
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (

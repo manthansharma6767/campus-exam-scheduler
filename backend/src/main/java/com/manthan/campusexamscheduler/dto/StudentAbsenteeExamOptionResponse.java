@@ -1,9 +1,11 @@
 package com.manthan.campusexamscheduler.dto;
 
+import com.manthan.campusexamscheduler.entity.AbsenteeAssignmentSource;
 import com.manthan.campusexamscheduler.entity.ExamType;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Getter
@@ -32,4 +34,12 @@ public class StudentAbsenteeExamOptionResponse {
     private ExamType examType;
 
     private boolean assigned;
+
+    private boolean locked;
+
+    private AbsenteeAssignmentSource source;
+
+    private LocalDateTime updatedAt;
+
+    private String updatedBy;
 }

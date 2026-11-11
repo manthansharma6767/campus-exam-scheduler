@@ -3,6 +3,8 @@ package com.manthan.campusexamscheduler.dto;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -33,4 +35,7 @@ public class StudentRequest {
 
     @NotNull
     private Long departmentId;
+
+    @Past
+    private LocalDate dateOfBirth;
 }

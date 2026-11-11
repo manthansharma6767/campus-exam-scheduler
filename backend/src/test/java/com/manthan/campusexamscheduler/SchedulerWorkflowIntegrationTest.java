@@ -13,16 +13,19 @@ import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.exception.ImportValidationException;
 import com.manthan.campusexamscheduler.exception.ScheduleConflictException;
 import com.manthan.campusexamscheduler.repository.AdministratorRepository;
+import com.manthan.campusexamscheduler.repository.StudentAbsenteeExamRepository;
 import com.manthan.campusexamscheduler.service.AdministratorService;
 import com.manthan.campusexamscheduler.service.AuthenticationService;
 import com.manthan.campusexamscheduler.service.DepartmentService;
 import com.manthan.campusexamscheduler.service.ExamService;
 import com.manthan.campusexamscheduler.service.StudentImportService;
 import com.manthan.campusexamscheduler.service.StudentService;
+import com.manthan.campusexamscheduler.service.StudentVerificationService;
 import com.manthan.campusexamscheduler.service.SubjectService;
 import com.manthan.campusexamscheduler.service.SeatingPlanService;
 import com.manthan.campusexamscheduler.service.TimetableImportService;
 import com.manthan.campusexamscheduler.util.JwtService;
+import com.jayway.jsonpath.JsonPath;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -62,7 +65,9 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -98,6 +103,24 @@ class SchedulerWorkflowIntegrationTest {
     private static final String MATRIX_CODE_2 = RUN_ID + "TH0502";
     private static final String ABSENTEE_CODE = testCode("ABS");
     private static final String ABSENTEE_CODE_2 = testCode("AB2");
+    private static final String LOCK_EMAIL = "lock.merge." + RUN_SUFFIX + "@example.test";
+    private static final String LOCK_ROLL = "RB-" + RUN_ID + "-LK";
+    private static final String LOCK_CODE_1 = testCode("LK1");
+    private static final String LOCK_CODE_2 = testCode("LK2");
+    private static final String COHORT_EMAIL = "cohort.cleanup." + RUN_SUFFIX + "@example.test";
+    private static final String COHORT_ROLL = "RB-" + RUN_ID + "-CH";
+    private static final String COHORT_CODE = testCode("CH1");
+    private static final String EXAM_CLEANUP_EMAIL = "exam.cleanup." + RUN_SUFFIX + "@example.test";
+    private static final String EXAM_CLEANUP_ROLL = "RB-" + RUN_ID + "-EC";
+    private static final String EXAM_CLEANUP_CODE_1 = testCode("EC1");
+    private static final String EXAM_CLEANUP_CODE_2 = testCode("EC2");
+    private static final String TOKEN_EMAIL = "stale.token." + RUN_SUFFIX + "@example.test";
+    private static final String TOKEN_ROLL = "RB-" + RUN_ID + "-TK";
+    private static final String TOKEN_CODE = testCode("TK1");
+    private static final String VERIFY_LIMIT_EMAIL = "verify.limit." + RUN_SUFFIX + "@example.test";
+    private static final String VERIFY_LIMIT_ROLL = "RB-" + RUN_ID + "-VL";
+    private static final String PASSWORD_ADMIN_EMAIL =
+            "password.admin." + RUN_SUFFIX + "@example.test";
     private static final String SEATING_TITLE = "Sessional Test 1 " + RUN_ID;
     private static final String SEATING_DEPARTMENT = "Department of Computer Science " + RUN_ID;
 
@@ -151,6 +174,12 @@ class SchedulerWorkflowIntegrationTest {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    private StudentVerificationService studentVerificationService;
+
+    @Autowired
+    private StudentAbsenteeExamRepository studentAbsenteeExamRepository;
 
     @BeforeEach
     void configureMockMvc() {
@@ -580,12 +609,14 @@ class SchedulerWorkflowIntegrationTest {
                 .semester(5)
                 .departmentId(department.getDepartmentId())
                 .build());
+        LocalDate dateOfBirth = LocalDate.of(2005, 8, 24);
         var student = studentService.registerStudent(StudentRequest.builder()
                 .name("Absentee Test Student")
                 .email(ABSENTEE_EMAIL)
                 .password("StudentPass123")
                 .enrollmentNumber(ABSENTEE_ROLL)
                 .semester(5)
+                .dateOfBirth(dateOfBirth)
                 .departmentId(department.getDepartmentId())
                 .build());
 
@@ -620,16 +651,33 @@ class SchedulerWorkflowIntegrationTest {
         assertEquals(2, studentService.getStudentSchedule(ABSENTEE_ROLL).size());
 
         mockMvc.perform(get("/api/students/{enrollmentNumber}/absentee-eligibility", ABSENTEE_ROLL))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/students/{enrollmentNumber}/verify", ABSENTEE_ROLL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dateOfBirth\":\"" + dateOfBirth + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andExpect(jsonPath("$.expiresInSeconds").value(600));
+
+        String verificationToken = studentVerificationService
+                .verify(ABSENTEE_ROLL, dateOfBirth)
+                .getToken();
+
+        mockMvc.perform(get("/api/students/{enrollmentNumber}/absentee-eligibility", ABSENTEE_ROLL)
+                        .header("X-Student-Verification", verificationToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].subjectCode").value(ABSENTEE_CODE))
                 .andExpect(jsonPath("$[0].assigned").value(false));
 
         mockMvc.perform(put("/api/students/{enrollmentNumber}/absentee-eligibility", ABSENTEE_ROLL)
+                        .header("X-Student-Verification", verificationToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"examIds\":[" + absenteeExam.getExamId() + "]}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].assigned").value(true));
+                .andExpect(jsonPath("$[0].assigned").value(true))
+                .andExpect(jsonPath("$[0].locked").value(false));
 
         var schedule = studentService.getStudentSchedule(ABSENTEE_ROLL);
         assertEquals(2, schedule.size());
@@ -656,6 +704,7 @@ class SchedulerWorkflowIntegrationTest {
                 .andExpect(jsonPath("$[0].assigned").value(true));
 
         mockMvc.perform(put("/api/students/{enrollmentNumber}/absentee-eligibility", ABSENTEE_ROLL)
+                        .header("X-Student-Verification", verificationToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"examIds\":[]}"))
                 .andExpect(status().isOk())
@@ -663,6 +712,426 @@ class SchedulerWorkflowIntegrationTest {
         var restoredSchedule = studentService.getStudentSchedule(ABSENTEE_ROLL);
         assertEquals(2, restoredSchedule.size());
         assertTrue(restoredSchedule.stream().allMatch(exam -> exam.getExamType() == ExamType.REGULAR));
+    }
+
+    @Test
+    void adminLockedAssignmentsSurviveStudentSavesAndAdminReplaceControlsTheSet() throws Exception {
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName(testName("Lock Merge Department")).build());
+        var lockedSubject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode(LOCK_CODE_1)
+                .subjectName("Locked Absentee Paper")
+                .semester(5)
+                .departmentId(department.getDepartmentId())
+                .build());
+        var openSubject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode(LOCK_CODE_2)
+                .subjectName("Open Absentee Paper")
+                .semester(5)
+                .departmentId(department.getDepartmentId())
+                .build());
+        LocalDate dateOfBirth = LocalDate.of(2004, 2, 17);
+        var student = studentService.registerStudent(StudentRequest.builder()
+                .name("Lock Merge Student")
+                .email(LOCK_EMAIL)
+                .password("StudentPass123")
+                .enrollmentNumber(LOCK_ROLL)
+                .semester(5)
+                .dateOfBirth(dateOfBirth)
+                .departmentId(department.getDepartmentId())
+                .build());
+        var lockedExam = examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2027, 1, 11))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(11, 0))
+                .roomNumber("L-101")
+                .building("Lock Hall")
+                .subjectId(lockedSubject.getSubjectId())
+                .examType(ExamType.ABSENTEE)
+                .build());
+        var openExam = examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2027, 1, 12))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(11, 0))
+                .roomNumber("L-102")
+                .building("Lock Hall")
+                .subjectId(openSubject.getSubjectId())
+                .examType(ExamType.ABSENTEE)
+                .build());
+
+        mockMvc.perform(put("/api/students/{studentId}/absentee-exams", student.getStudentId())
+                        .with(user("lock-admin"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"examIds\":[" + lockedExam.getExamId() + ","
+                                + openExam.getExamId() + "],\"lockedExamIds\":["
+                                + lockedExam.getExamId() + "]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].assigned").value(true))
+                .andExpect(jsonPath("$[0].locked").value(true))
+                .andExpect(jsonPath("$[0].source").value("ADMIN"))
+                .andExpect(jsonPath("$[0].updatedBy").value("lock-admin"))
+                .andExpect(jsonPath("$[1].assigned").value(true))
+                .andExpect(jsonPath("$[1].locked").value(false));
+
+        String verificationToken = studentVerificationService
+                .verify(LOCK_ROLL.toLowerCase(Locale.ROOT), dateOfBirth)
+                .getToken();
+
+        // A student clearing every checkbox cannot remove the locked paper.
+        mockMvc.perform(put("/api/students/{enrollmentNumber}/absentee-eligibility", LOCK_ROLL)
+                        .header("X-Student-Verification", verificationToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"examIds\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].assigned").value(true))
+                .andExpect(jsonPath("$[0].locked").value(true))
+                .andExpect(jsonPath("$[1].assigned").value(false));
+
+        // The student may still claim the unlocked paper.
+        mockMvc.perform(put("/api/students/{enrollmentNumber}/absentee-eligibility", LOCK_ROLL)
+                        .header("X-Student-Verification", verificationToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"examIds\":[" + openExam.getExamId() + "]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].assigned").value(true))
+                .andExpect(jsonPath("$[0].locked").value(true))
+                .andExpect(jsonPath("$[1].assigned").value(true))
+                .andExpect(jsonPath("$[1].locked").value(false))
+                .andExpect(jsonPath("$[1].source").value("STUDENT"))
+                .andExpect(jsonPath("$[1].updatedBy").value(LOCK_ROLL));
+
+        // An admin save replaces the entire set, including previously locked rows.
+        mockMvc.perform(put("/api/students/{studentId}/absentee-exams", student.getStudentId())
+                        .with(user("lock-admin"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"examIds\":[" + openExam.getExamId() + "],\"lockedExamIds\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].assigned").value(false))
+                .andExpect(jsonPath("$[1].assigned").value(true))
+                .andExpect(jsonPath("$[1].locked").value(false))
+                .andExpect(jsonPath("$[1].source").value("ADMIN"));
+
+        assertEquals(1, studentAbsenteeExamRepository
+                .findByStudent_StudentId(student.getStudentId()).size());
+    }
+
+    @Test
+    void changingStudentCohortRemovesStaleAbsenteeMappings() throws Exception {
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName(testName("Cohort Cleanup Department")).build());
+        var otherDepartment = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName(testName("Cohort Cleanup Other Department")).build());
+        var subject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode(COHORT_CODE)
+                .subjectName("Cohort Cleanup Paper")
+                .semester(5)
+                .departmentId(department.getDepartmentId())
+                .build());
+        var student = studentService.registerStudent(StudentRequest.builder()
+                .name("Cohort Cleanup Student")
+                .email(COHORT_EMAIL)
+                .password("StudentPass123")
+                .enrollmentNumber(COHORT_ROLL)
+                .semester(5)
+                .dateOfBirth(LocalDate.of(2004, 6, 3))
+                .departmentId(department.getDepartmentId())
+                .build());
+        var exam = examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2027, 3, 11))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(11, 0))
+                .roomNumber("C-101")
+                .building("Cohort Hall")
+                .subjectId(subject.getSubjectId())
+                .examType(ExamType.ABSENTEE)
+                .build());
+
+        studentService.updateAbsenteeEligibility(
+                student.getStudentId(), List.of(exam.getExamId()), List.of(exam.getExamId()), "admin");
+        assertEquals(1, studentAbsenteeExamRepository
+                .findByStudent_StudentId(student.getStudentId()).size());
+
+        studentService.updateStudent(student.getStudentId(), StudentRequest.builder()
+                .name("Cohort Cleanup Student")
+                .email(COHORT_EMAIL)
+                .enrollmentNumber(COHORT_ROLL)
+                .semester(6)
+                .departmentId(department.getDepartmentId())
+                .build());
+        assertTrue(studentAbsenteeExamRepository
+                .findByStudent_StudentId(student.getStudentId()).isEmpty());
+
+        // Move the student back, assign again, then change the department.
+        studentService.updateStudent(student.getStudentId(), StudentRequest.builder()
+                .name("Cohort Cleanup Student")
+                .email(COHORT_EMAIL)
+                .enrollmentNumber(COHORT_ROLL)
+                .semester(5)
+                .departmentId(department.getDepartmentId())
+                .build());
+        studentService.updateAbsenteeEligibility(
+                student.getStudentId(), List.of(exam.getExamId()), List.of(exam.getExamId()), "admin");
+        assertEquals(1, studentAbsenteeExamRepository
+                .findByStudent_StudentId(student.getStudentId()).size());
+
+        studentService.updateStudent(student.getStudentId(), StudentRequest.builder()
+                .name("Cohort Cleanup Student")
+                .email(COHORT_EMAIL)
+                .enrollmentNumber(COHORT_ROLL)
+                .semester(5)
+                .departmentId(otherDepartment.getDepartmentId())
+                .build());
+        assertTrue(studentAbsenteeExamRepository
+                .findByStudent_StudentId(student.getStudentId()).isEmpty());
+    }
+
+    @Test
+    void changingExamTypeOrCohortRemovesStaleAbsenteeMappings() throws Exception {
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName(testName("Exam Cleanup Department")).build());
+        var subject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode(EXAM_CLEANUP_CODE_1)
+                .subjectName("Exam Cleanup Paper")
+                .semester(5)
+                .departmentId(department.getDepartmentId())
+                .build());
+        var nextSemesterSubject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode(EXAM_CLEANUP_CODE_2)
+                .subjectName("Exam Cleanup Next Semester Paper")
+                .semester(6)
+                .departmentId(department.getDepartmentId())
+                .build());
+        var student = studentService.registerStudent(StudentRequest.builder()
+                .name("Exam Cleanup Student")
+                .email(EXAM_CLEANUP_EMAIL)
+                .password("StudentPass123")
+                .enrollmentNumber(EXAM_CLEANUP_ROLL)
+                .semester(5)
+                .dateOfBirth(LocalDate.of(2004, 7, 4))
+                .departmentId(department.getDepartmentId())
+                .build());
+        var exam = examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2027, 4, 11))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(11, 0))
+                .roomNumber("E-101")
+                .building("Exam Cleanup Hall")
+                .subjectId(subject.getSubjectId())
+                .examType(ExamType.ABSENTEE)
+                .build());
+
+        studentService.updateAbsenteeEligibility(
+                student.getStudentId(), List.of(exam.getExamId()), List.of(exam.getExamId()), "admin");
+        assertEquals(1, studentAbsenteeExamRepository
+                .findByStudent_StudentId(student.getStudentId()).size());
+
+        // Turning an absentee exam into a regular exam invalidates its mappings.
+        examService.updateExam(exam.getExamId(), ExamRequest.builder()
+                .examDate(LocalDate.of(2027, 4, 11))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(11, 0))
+                .roomNumber("E-101")
+                .building("Exam Cleanup Hall")
+                .subjectId(subject.getSubjectId())
+                .examType(ExamType.REGULAR)
+                .build());
+        assertTrue(studentAbsenteeExamRepository
+                .findByStudent_StudentId(student.getStudentId()).isEmpty());
+
+        var reassignedExam = examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2027, 4, 12))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(11, 0))
+                .roomNumber("E-102")
+                .building("Exam Cleanup Hall")
+                .subjectId(subject.getSubjectId())
+                .examType(ExamType.ABSENTEE)
+                .build());
+        studentService.updateAbsenteeEligibility(
+                student.getStudentId(), List.of(reassignedExam.getExamId()),
+                List.of(reassignedExam.getExamId()), "admin");
+        assertEquals(1, studentAbsenteeExamRepository
+                .findByStudent_StudentId(student.getStudentId()).size());
+
+        // Moving the exam to another semester invalidates the student mapping.
+        examService.updateExam(reassignedExam.getExamId(), ExamRequest.builder()
+                .examDate(LocalDate.of(2027, 4, 12))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(11, 0))
+                .roomNumber("E-102")
+                .building("Exam Cleanup Hall")
+                .subjectId(nextSemesterSubject.getSubjectId())
+                .examType(ExamType.ABSENTEE)
+                .build());
+        assertTrue(studentAbsenteeExamRepository
+                .findByStudent_StudentId(student.getStudentId()).isEmpty());
+    }
+
+    @Test
+    void invalidBearerTokensNeverAuthenticateButDoNotBlockPublicEndpoints() throws Exception {
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName(testName("Stale Token Department")).build());
+        var subject = subjectService.createSubject(SubjectRequest.builder()
+                .subjectCode(TOKEN_CODE)
+                .subjectName("Stale Token Paper")
+                .semester(5)
+                .departmentId(department.getDepartmentId())
+                .build());
+        LocalDate dateOfBirth = LocalDate.of(2004, 9, 5);
+        studentService.registerStudent(StudentRequest.builder()
+                .name("Stale Token Student")
+                .email(TOKEN_EMAIL)
+                .password("StudentPass123")
+                .enrollmentNumber(TOKEN_ROLL)
+                .semester(5)
+                .dateOfBirth(dateOfBirth)
+                .departmentId(department.getDepartmentId())
+                .build());
+        examService.createExam(ExamRequest.builder()
+                .examDate(LocalDate.of(2027, 5, 11))
+                .examTime(LocalTime.of(9, 0))
+                .examEndTime(LocalTime.of(11, 0))
+                .roomNumber("T-101")
+                .building("Token Hall")
+                .subjectId(subject.getSubjectId())
+                .examType(ExamType.REGULAR)
+                .build());
+
+        String malformedToken = "definitely-not-a-jwt";
+        mockMvc.perform(get("/api/students/{enrollmentNumber}/schedule", TOKEN_ROLL)
+                        .header("Authorization", "Bearer " + malformedToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].subjectCode").value(TOKEN_CODE));
+        mockMvc.perform(get("/api/exams/search")
+                        .param("query", TOKEN_CODE)
+                        .header("Authorization", "Bearer " + malformedToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/departments")
+                        .header("Authorization", "Bearer " + malformedToken))
+                .andExpect(status().isUnauthorized());
+
+        // A student verification token is not an admin access token.
+        String verificationToken = studentVerificationService
+                .verify(TOKEN_ROLL, dateOfBirth)
+                .getToken();
+        mockMvc.perform(get("/api/departments")
+                        .header("Authorization", "Bearer " + verificationToken))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/students/{enrollmentNumber}/schedule", TOKEN_ROLL)
+                        .header("Authorization", "Bearer " + verificationToken))
+                .andExpect(status().isOk());
+
+        // A signed token for an admin that no longer exists is ignored too.
+        String unknownAdminToken = jwtService
+                .generateToken("missing-admin." + RUN_SUFFIX + "@example.test");
+        mockMvc.perform(get("/api/departments")
+                        .header("Authorization", "Bearer " + unknownAdminToken))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/students/{enrollmentNumber}/schedule", TOKEN_ROLL)
+                        .header("Authorization", "Bearer " + unknownAdminToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void publicLoginAndStudentVerificationAttemptsAreRateLimited() throws Exception {
+        String loginEmail = "rate.limit." + RUN_SUFFIX + "@example.test";
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"" + loginEmail
+                                    + "\",\"password\":\"WrongPass123\"}"))
+                    .andExpect(status().isUnauthorized());
+        }
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + loginEmail
+                                + "\",\"password\":\"WrongPass123\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"));
+
+        var department = departmentService.createDepartment(
+                DepartmentRequest.builder().departmentName(testName("Verify Limit Department")).build());
+        studentService.registerStudent(StudentRequest.builder()
+                .name("Verify Limit Student")
+                .email(VERIFY_LIMIT_EMAIL)
+                .password("StudentPass123")
+                .enrollmentNumber(VERIFY_LIMIT_ROLL)
+                .semester(5)
+                .dateOfBirth(LocalDate.of(2005, 3, 9))
+                .departmentId(department.getDepartmentId())
+                .build());
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(post("/api/students/{enrollmentNumber}/verify", VERIFY_LIMIT_ROLL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"dateOfBirth\":\"2005-03-10\"}"))
+                    .andExpect(status().isUnauthorized());
+        }
+        mockMvc.perform(post("/api/students/{enrollmentNumber}/verify", VERIFY_LIMIT_ROLL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dateOfBirth\":\"2005-03-09\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"));
+    }
+
+    @Test
+    void adminPasswordChangeRequiresCurrentPasswordAndRotatesCredentials() throws Exception {
+        AdministratorRequest admin = AdministratorRequest.builder()
+                .name("Password Change Admin")
+                .email(PASSWORD_ADMIN_EMAIL)
+                .password("CurrentPass123")
+                .build();
+        administratorService.registerAdmin(admin);
+
+        String token = loginToken(admin.getEmail(), admin.getPassword());
+
+        mockMvc.perform(put("/api/auth/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"CurrentPass123\","
+                                + "\"newPassword\":\"NewPass12345\"}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/api/auth/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"WrongPass123\","
+                                + "\"newPassword\":\"NewPass12345\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/auth/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"CurrentPass123\","
+                                + "\"newPassword\":\"CurrentPass123\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/auth/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"CurrentPass123\","
+                                + "\"newPassword\":\"NewPass12345\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + PASSWORD_ADMIN_EMAIL
+                                + "\",\"password\":\"CurrentPass123\"}"))
+                .andExpect(status().isUnauthorized());
+        loginToken(admin.getEmail(), "NewPass12345");
+    }
+
+    private String loginToken(String email, String password) throws Exception {
+        String body = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\""
+                                + password + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return JsonPath.read(body, "$.token");
     }
 
     @Test

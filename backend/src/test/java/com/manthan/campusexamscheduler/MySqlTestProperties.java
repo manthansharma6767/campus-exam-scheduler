@@ -49,6 +49,7 @@ final class MySqlTestProperties {
         // truncate, or drop its tables.
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
         registry.add("spring.sql.init.mode", () -> "never");
+        registry.add("spring.flyway.enabled", () -> "false");
         registry.add("JWT_SECRET", () -> TEST_JWT_SECRET);
         registry.add("ADMIN_SETUP_TOKEN", () -> TEST_ADMIN_SETUP_TOKEN);
     }

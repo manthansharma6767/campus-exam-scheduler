@@ -1,12 +1,15 @@
 package com.manthan.campusexamscheduler.service;
 
 import com.manthan.campusexamscheduler.dto.StudentImportResponse;
+import com.manthan.campusexamscheduler.dto.StudentDobBackfillPreviewResponse;
+import com.manthan.campusexamscheduler.dto.StudentDobBackfillResponse;
 import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
 import com.manthan.campusexamscheduler.dto.ImportPreviewRow;
 import com.manthan.campusexamscheduler.dto.ImportRowError;
 import com.manthan.campusexamscheduler.entity.Department;
 import com.manthan.campusexamscheduler.entity.Student;
 import com.manthan.campusexamscheduler.exception.ImportValidationException;
+import com.manthan.campusexamscheduler.exception.StudentDobBackfillValidationException;
 import com.manthan.campusexamscheduler.repository.DepartmentRepository;
 import com.manthan.campusexamscheduler.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ public class StudentImportService {
 
     private static final Set<String> REQUIRED_HEADERS = Set.of(
             "name", "email", "password", "enrollmentNumber", "semester");
+    private static final Set<String> DOB_BACKFILL_HEADERS = Set.of("enrollmentNumber", "dateOfBirth");
     private static final int HEADER_SCAN_LIMIT = 20;
     private static final int MAX_PREVIEW_ROWS = 200;
     private static final String CSV_PARSE_ERROR_MARKER = "__CSV_PARSE_ERROR__";
@@ -73,24 +77,148 @@ public class StudentImportService {
                 .build();
     }
 
-    private StudentAnalysis analyzeStudents(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Choose a non-empty student file.");
+    @Transactional(readOnly = true)
+    public StudentDobBackfillPreviewResponse previewStudentDobBackfill(MultipartFile file) {
+        return toDobBackfillPreview(analyzeStudentDobBackfill(file));
+    }
+
+    @Transactional
+    public StudentDobBackfillResponse backfillStudentDob(MultipartFile file) {
+        StudentDobBackfillAnalysis analysis = analyzeStudentDobBackfill(file);
+        StudentDobBackfillPreviewResponse preview = toDobBackfillPreview(analysis);
+        if (!preview.canApply()) {
+            throw new StudentDobBackfillValidationException(preview);
         }
 
-        String filename = Optional.ofNullable(file.getOriginalFilename()).orElse("").toLowerCase(Locale.ROOT);
-        List<String[]> rows;
-        try {
-            if (filename.endsWith(".xlsx") || filename.endsWith(".xls")) {
-                rows = readSpreadsheet(file);
-            } else if (filename.endsWith(".csv")) {
-                rows = readCsv(file);
-            } else {
-                throw new IllegalArgumentException("Supported student files are CSV, XLS, and XLSX.");
-            }
-        } catch (IOException exception) {
-            throw new IllegalArgumentException("The student file could not be read. Check that it is a valid, unprotected CSV or Excel file.");
+        int updated = analysis.candidates().stream()
+                .mapToInt(candidate -> studentRepository.setDateOfBirthIfMissing(
+                        candidate.student().getStudentId(), candidate.dateOfBirth()))
+                .sum();
+        int alreadyPopulated = analysis.alreadyPopulated() + analysis.candidates().size() - updated;
+
+        return new StudentDobBackfillResponse(
+                updated,
+                alreadyPopulated,
+                analysis.notFound(),
+                analysis.totalRows(),
+                "Backfilled " + updated + " student date(s) of birth; "
+                        + "preserved " + alreadyPopulated + " existing date(s) and skipped "
+                        + analysis.notFound() + " unmatched enrollment number(s).");
+    }
+
+    private StudentDobBackfillAnalysis analyzeStudentDobBackfill(MultipartFile file) {
+        List<String[]> rows = readStudentRows(file);
+        int headerRow = findHeaderRow(rows, DOB_BACKFILL_HEADERS);
+        if (headerRow < 0 || rows.size() <= headerRow + 1) {
+            throw new IllegalArgumentException(
+                    "The student DOB file must have Enrollment Number and Date of Birth headers and at least one student row.");
         }
+
+        Map<String, Integer> columns = headerColumns(rows.get(headerRow), DOB_BACKFILL_HEADERS);
+        List<StudentDobCandidate> candidates = new ArrayList<>();
+        List<ImportPreviewRow> previewRows = new ArrayList<>();
+        List<ImportRowError> errors = new ArrayList<>();
+        Set<String> seenEnrollmentNumbers = new HashSet<>();
+        int alreadyPopulated = 0;
+        int notFound = 0;
+        int totalRows = 0;
+
+        for (int index = headerRow + 1; index < rows.size(); index++) {
+            String[] row = rows.get(index);
+            if (Arrays.stream(row).allMatch(value -> value == null || value.isBlank())) continue;
+            totalRows++;
+            int rowNumber = index + 1;
+
+            if (row.length > 0 && CSV_PARSE_ERROR_MARKER.equals(row[0])) {
+                errors.add(new ImportRowError(rowNumber, row.length > 1 ? row[1] : "Malformed CSV row."));
+                continue;
+            }
+
+            try {
+                String enrollmentNumber = cell(row, columns, "enrollmentNumber").trim();
+                if (enrollmentNumber.isBlank() || enrollmentNumber.length() > 255) {
+                    throw new IllegalArgumentException(
+                            "enrollment number is required and must be at most 255 characters");
+                }
+                String normalizedEnrollment = enrollmentNumber.toUpperCase(Locale.ROOT);
+                if (!seenEnrollmentNumbers.add(normalizedEnrollment)) {
+                    throw new IllegalArgumentException("enrollment number appears more than once in this file");
+                }
+                String dateText = cell(row, columns, "dateOfBirth").trim();
+                if (dateText.isBlank()) {
+                    throw new IllegalArgumentException("date of birth is required");
+                }
+                LocalDate dateOfBirth = parseDateOfBirth(dateText);
+                Optional<Student> matchingStudent =
+                        studentRepository.findByEnrollmentNumberIgnoreCase(enrollmentNumber);
+
+                String status;
+                if (matchingStudent.isEmpty()) {
+                    notFound++;
+                    status = "Student not found";
+                } else if (matchingStudent.get().getDateOfBirth() != null) {
+                    alreadyPopulated++;
+                    status = "DOB already set; unchanged";
+                } else {
+                    candidates.add(new StudentDobCandidate(matchingStudent.get(), dateOfBirth));
+                    status = "Will backfill";
+                }
+
+                Map<String, String> values = new LinkedHashMap<>();
+                values.put("Enrollment Number", enrollmentNumber);
+                values.put("Date of Birth", dateOfBirth.toString());
+                values.put("Result", status);
+                previewRows.add(new ImportPreviewRow(rowNumber, values));
+            } catch (IllegalArgumentException exception) {
+                errors.add(new ImportRowError(rowNumber, exception.getMessage()));
+            }
+        }
+
+        if (totalRows == 0) {
+            errors.add(new ImportRowError(headerRow + 2, "No student rows were found in the file."));
+        }
+        return new StudentDobBackfillAnalysis(
+                candidates, alreadyPopulated, notFound, totalRows, errors, previewRows);
+    }
+
+    private StudentDobBackfillPreviewResponse toDobBackfillPreview(
+            StudentDobBackfillAnalysis analysis) {
+        boolean canApply = analysis.errors().isEmpty() && !analysis.candidates().isEmpty();
+        String message;
+        if (!analysis.errors().isEmpty()) {
+            message = "Fix the listed row errors before backfilling. No dates of birth were changed.";
+        } else if (canApply) {
+            message = "Ready to backfill " + analysis.candidates().size() + " student(s); preserved "
+                    + analysis.alreadyPopulated() + " existing date(s) and skipped " + analysis.notFound()
+                    + " unmatched enrollment number(s).";
+        } else {
+            message = "No missing dates of birth were found to backfill; preserved "
+                    + analysis.alreadyPopulated() + " existing date(s) and skipped " + analysis.notFound()
+                    + " unmatched enrollment number(s).";
+        }
+
+        return new StudentDobBackfillPreviewResponse(
+                analysis.candidates().size(),
+                analysis.alreadyPopulated(),
+                analysis.notFound(),
+                canApply,
+                analysis.previewRows().size() > MAX_PREVIEW_ROWS,
+                analysis.previewRows().stream().limit(MAX_PREVIEW_ROWS).toList(),
+                analysis.errors(),
+                message);
+    }
+
+    private record StudentDobCandidate(Student student, LocalDate dateOfBirth) { }
+    private record StudentDobBackfillAnalysis(
+            List<StudentDobCandidate> candidates,
+            int alreadyPopulated,
+            int notFound,
+            int totalRows,
+            List<ImportRowError> errors,
+            List<ImportPreviewRow> previewRows) { }
+
+    private StudentAnalysis analyzeStudents(MultipartFile file) {
+        List<String[]> rows = readStudentRows(file);
 
         int headerRow = findHeaderRow(rows);
         if (headerRow < 0 || rows.size() <= headerRow + 1) {
@@ -326,10 +454,34 @@ public class StudentImportService {
         return cells.toArray(String[]::new);
     }
 
+    private List<String[]> readStudentRows(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Choose a non-empty student file.");
+        }
+
+        String filename = Optional.ofNullable(file.getOriginalFilename()).orElse("").toLowerCase(Locale.ROOT);
+        try {
+            if (filename.endsWith(".xlsx") || filename.endsWith(".xls")) {
+                return readSpreadsheet(file);
+            }
+            if (filename.endsWith(".csv")) {
+                return readCsv(file);
+            }
+            throw new IllegalArgumentException("Supported student files are CSV, XLS, and XLSX.");
+        } catch (IOException exception) {
+            throw new IllegalArgumentException(
+                    "The student file could not be read. Check that it is a valid, unprotected CSV or Excel file.");
+        }
+    }
+
     private int findHeaderRow(List<String[]> rows) {
+        return findHeaderRow(rows, REQUIRED_HEADERS);
+    }
+
+    private int findHeaderRow(List<String[]> rows, Set<String> requiredHeaders) {
         for (int index = 0; index < Math.min(rows.size(), HEADER_SCAN_LIMIT); index++) {
             try {
-                headerColumns(rows.get(index));
+                headerColumns(rows.get(index), requiredHeaders);
                 return index;
             } catch (IllegalArgumentException ignored) {
                 // Allow a title or note before the column headers.
@@ -339,6 +491,10 @@ public class StudentImportService {
     }
 
     private Map<String, Integer> headerColumns(String[] header) {
+        return headerColumns(header, REQUIRED_HEADERS);
+    }
+
+    private Map<String, Integer> headerColumns(String[] header, Set<String> requiredHeaders) {
         Map<String, Integer> columns = new HashMap<>();
         for (int index = 0; index < header.length; index++) {
             String normalized = header[index].toLowerCase(Locale.ROOT).replaceAll("[^a-z]", "");
@@ -355,8 +511,15 @@ public class StudentImportService {
             };
             if (key != null) columns.put(key, index);
         }
-        if (!columns.keySet().containsAll(REQUIRED_HEADERS)
-                || (!columns.containsKey("departmentName") && !columns.containsKey("departmentId"))) {
+        if (!columns.keySet().containsAll(requiredHeaders)) {
+            if (requiredHeaders.equals(DOB_BACKFILL_HEADERS)) {
+                throw new IllegalArgumentException(
+                        "Required columns: Enrollment Number and Date of Birth.");
+            }
+            throw new IllegalArgumentException("Required columns: Name, Email, Password, Roll/Enrollment Number, Semester, and Department (name or ID).");
+        }
+        if (requiredHeaders.equals(REQUIRED_HEADERS)
+                && !columns.containsKey("departmentName") && !columns.containsKey("departmentId")) {
             throw new IllegalArgumentException("Required columns: Name, Email, Password, Roll/Enrollment Number, Semester, and Department (name or ID).");
         }
         return columns;

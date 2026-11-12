@@ -34,6 +34,18 @@ public class StudentController {
         return ResponseEntity.ok(studentImportService.importStudents(file));
     }
 
+    @PostMapping(value = "/dob-backfill/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<StudentDobBackfillPreviewResponse> previewStudentDobBackfill(
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(studentImportService.previewStudentDobBackfill(file));
+    }
+
+    @PostMapping(value = "/dob-backfill", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<StudentDobBackfillResponse> backfillStudentDob(
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(studentImportService.backfillStudentDob(file));
+    }
+
     @PostMapping
     public ResponseEntity<StudentResponse> createStudent(
             @Valid @RequestBody StudentRequest request) throws RuntimeException {

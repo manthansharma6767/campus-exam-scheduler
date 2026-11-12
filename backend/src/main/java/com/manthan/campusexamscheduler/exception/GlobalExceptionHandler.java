@@ -2,6 +2,7 @@ package com.manthan.campusexamscheduler.exception;
 
 import com.manthan.campusexamscheduler.dto.ErrorResponse;
 import com.manthan.campusexamscheduler.dto.ImportPreviewResponse;
+import com.manthan.campusexamscheduler.dto.StudentDobBackfillPreviewResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -96,6 +97,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ImportValidationException.class)
     public ResponseEntity<ImportPreviewResponse> handleImportValidation(ImportValidationException ex) {
+        return ResponseEntity.unprocessableContent().body(ex.getPreview());
+    }
+
+    @ExceptionHandler(StudentDobBackfillValidationException.class)
+    public ResponseEntity<StudentDobBackfillPreviewResponse> handleStudentDobBackfillValidation(
+            StudentDobBackfillValidationException ex) {
         return ResponseEntity.unprocessableContent().body(ex.getPreview());
     }
 

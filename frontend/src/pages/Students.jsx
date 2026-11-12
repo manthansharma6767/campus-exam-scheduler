@@ -55,6 +55,12 @@ export default function Students() {
   const [importing, setImporting] = useState(false);
   const [importAction, setImportAction] = useState('');
   const [importPreview, setImportPreview] = useState(null);
+  const [dobBackfillDialogOpen, setDobBackfillDialogOpen] = useState(false);
+  const [dobBackfillFile, setDobBackfillFile] = useState(null);
+  const [dobBackfillPreview, setDobBackfillPreview] = useState(null);
+  const [dobBackfillError, setDobBackfillError] = useState('');
+  const [dobBackfilling, setDobBackfilling] = useState(false);
+  const [dobBackfillAction, setDobBackfillAction] = useState('');
   const [absenteeStudent, setAbsenteeStudent] = useState(null);
 
   const fetchData = async () => {
@@ -229,6 +235,72 @@ export default function Students() {
     }
   };
 
+  const downloadDobBackfillTemplate = () => {
+    const template = new Blob(
+      ['Enrollment Number,Date of Birth\r\n'],
+      { type: 'text/csv;charset=utf-8' }
+    );
+    const url = URL.createObjectURL(template);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'student-dob-backfill-template.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDobBackfillPreview = async () => {
+    if (!dobBackfillFile) {
+      setDobBackfillError('Choose a CSV or Excel file first.');
+      return;
+    }
+    setDobBackfilling(true);
+    setDobBackfillAction('preview');
+    setDobBackfillError('');
+    try {
+      const data = new FormData();
+      data.append('file', dobBackfillFile);
+      const response = await api.post('/api/students/dob-backfill/preview', data);
+      setDobBackfillPreview(response.data);
+    } catch (err) {
+      if (err.response?.data?.errors) setDobBackfillPreview(err.response.data);
+      setDobBackfillError(err.response?.data?.message || 'DOB backfill preview failed. Check the file and try again.');
+    } finally {
+      setDobBackfilling(false);
+      setDobBackfillAction('');
+    }
+  };
+
+  const handleDobBackfill = async () => {
+    if (!dobBackfillFile || !dobBackfillPreview?.canApply) return;
+    setDobBackfilling(true);
+    setDobBackfillAction('apply');
+    setDobBackfillError('');
+    try {
+      const data = new FormData();
+      data.append('file', dobBackfillFile);
+      const response = await api.post('/api/students/dob-backfill', data);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      setDobBackfillDialogOpen(false);
+      setDobBackfillFile(null);
+      setDobBackfillPreview(null);
+      fetchData();
+    } catch (err) {
+      if (err.response?.data?.errors) setDobBackfillPreview(err.response.data);
+      setDobBackfillError(err.response?.data?.message || 'DOB backfill failed. Check the file and try again.');
+    } finally {
+      setDobBackfilling(false);
+      setDobBackfillAction('');
+    }
+  };
+
+  const closeDobBackfillDialog = () => {
+    if (dobBackfilling) return;
+    setDobBackfillDialogOpen(false);
+    setDobBackfillFile(null);
+    setDobBackfillPreview(null);
+    setDobBackfillError('');
+  };
+
   const closeImportDialog = () => {
     if (importing) return;
     setImportDialogOpen(false);
@@ -258,6 +330,11 @@ export default function Students() {
         <Box sx={{ background: '#1A1A1A', minHeight: '60vh' }}>
           <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
+              <Button id="backfill-student-dob-button" variant="outlined" startIcon={<UploadFileIcon />}
+                onClick={() => { setDobBackfillError(''); setDobBackfillPreview(null); setDobBackfillFile(null); setDobBackfillDialogOpen(true); }}
+                sx={{ color: '#FFB74D', borderColor: 'rgba(255,183,77,0.5)', '&:hover': { borderColor: '#FFB74D', backgroundColor: 'rgba(255,183,77,0.08)' } }}>
+                Backfill DOB
+              </Button>
               <Button id="import-students-button" variant="outlined" startIcon={<UploadFileIcon />}
                 onClick={() => { setImportError(''); setImportPreview(null); setImportFile(null); setImportDialogOpen(true); }}
                 sx={{ color: '#FFB74D', borderColor: 'rgba(255,183,77,0.5)', '&:hover': { borderColor: '#FFB74D', backgroundColor: 'rgba(255,183,77,0.08)' } }}>
@@ -365,6 +442,65 @@ export default function Students() {
             <Button onClick={handleImport} variant="contained" disabled={importing || !importFile || !importPreview?.canImport}
               sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
               {importing && importAction === 'commit' ? 'Importing...' : 'Confirm import'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={dobBackfillDialogOpen} onClose={closeDobBackfillDialog} maxWidth="md" fullWidth aria-labelledby="student-dob-backfill-title">
+          <DialogTitle id="student-dob-backfill-title">Backfill Student Dates of Birth</DialogTitle>
+          <DialogContent>
+            {dobBackfillError && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{dobBackfillError}</Alert>}
+            <Typography sx={{ color: 'text.secondary', mb: 2 }}>
+              Upload a CSV, XLS, or XLSX file with Enrollment Number and Date of Birth columns. Dates may use YYYY-MM-DD. Only students with a missing date of birth will be updated; existing dates are never overwritten.
+            </Typography>
+            <Button onClick={downloadDobBackfillTemplate} sx={{ mb: 2, px: 0 }}>
+              Download CSV template
+            </Button>
+            <Box>
+              <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} disabled={dobBackfilling}>
+                Choose file
+                <input
+                  hidden
+                  type="file"
+                  accept=".csv,.xls,.xlsx"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    event.target.value = '';
+                    setDobBackfillFile(file);
+                    setDobBackfillError('');
+                    setDobBackfillPreview(null);
+                  }}
+                />
+              </Button>
+              <Typography component="span" sx={{ ml: 1.5, color: 'text.secondary', overflowWrap: 'anywhere' }}>
+                {dobBackfillFile?.name || 'No file selected'}
+              </Typography>
+            </Box>
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Preview checks the whole file first. Unmatched enrollment numbers and students who already have a date are skipped; duplicate enrollment numbers, missing dates, and invalid rows block all updates.
+            </Alert>
+            <ImportPreviewPanel
+              preview={dobBackfillPreview && {
+                ...dobBackfillPreview,
+                canImport: dobBackfillPreview.canApply,
+              }}
+              counts={dobBackfillPreview && [
+                { label: `${dobBackfillPreview.eligibleRows} missing DOB(s) to backfill`, color: 'success' },
+                { label: `${dobBackfillPreview.alreadyPopulated} existing DOB(s) preserved` },
+                { label: `${dobBackfillPreview.notFound} unmatched enrollment number(s)` },
+                { label: `${dobBackfillPreview.errors?.length || 0} row error(s)`, color: dobBackfillPreview.errors?.length ? 'error' : 'default' },
+              ]}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={closeDobBackfillDialog} color="inherit" variant="outlined" disabled={dobBackfilling}>Cancel</Button>
+            <Button onClick={handleDobBackfillPreview} variant="outlined" disabled={dobBackfilling || !dobBackfillFile}
+              sx={{ borderColor: '#FF8F00', color: '#FFB300' }}>
+              {dobBackfilling && dobBackfillAction === 'preview' ? 'Checking...' : 'Preview backfill'}
+            </Button>
+            <Button onClick={handleDobBackfill} variant="contained" disabled={dobBackfilling || !dobBackfillFile || !dobBackfillPreview?.canApply}
+              sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
+              {dobBackfilling && dobBackfillAction === 'apply' ? 'Backfilling...' : 'Confirm backfill'}
             </Button>
           </DialogActions>
         </Dialog>

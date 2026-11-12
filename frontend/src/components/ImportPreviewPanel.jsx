@@ -9,11 +9,17 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 
-export default function ImportPreviewPanel({ preview }) {
+export default function ImportPreviewPanel({ preview, counts }) {
   if (!preview) return null;
 
   const rows = preview.rows || [];
   const columns = Object.keys(rows[0]?.values || {});
+  const summaryCounts = counts || [
+    { label: `${preview.validRows} valid row(s)`, color: 'success' },
+    { label: `${preview.skippedDuplicates} duplicate(s) to skip` },
+    { label: `${preview.errors?.length || 0} row error(s)`, color: preview.errors?.length ? 'error' : 'default' },
+    { label: `${preview.conflicts?.length || 0} schedule conflict(s)`, color: preview.conflicts?.length ? 'error' : 'default' },
+  ];
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -21,10 +27,9 @@ export default function ImportPreviewPanel({ preview }) {
         {preview.message}
       </Alert>
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-        <Chip size="small" label={`${preview.validRows} valid row(s)`} color="success" variant="outlined" />
-        <Chip size="small" label={`${preview.skippedDuplicates} duplicate(s) to skip`} variant="outlined" />
-        <Chip size="small" label={`${preview.errors?.length || 0} row error(s)`} color={preview.errors?.length ? 'error' : 'default'} variant="outlined" />
-        <Chip size="small" label={`${preview.conflicts?.length || 0} schedule conflict(s)`} color={preview.conflicts?.length ? 'error' : 'default'} variant="outlined" />
+        {summaryCounts.map((count) => (
+          <Chip key={count.label} size="small" label={count.label} color={count.color || 'default'} variant="outlined" />
+        ))}
       </Box>
 
       {!!preview.errors?.length && (
@@ -54,7 +59,7 @@ export default function ImportPreviewPanel({ preview }) {
           <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Import preview</Typography>
           {preview.previewTruncated && (
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-              Showing the first {rows.length} valid rows.
+              Showing the first {rows.length} preview rows.
             </Typography>
           )}
           <TableContainer sx={{ maxHeight: 280, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>

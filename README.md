@@ -12,6 +12,7 @@ Campus Exam Scheduler is a full-stack application for publishing university exam
 - Stateless JWT authentication for the administration area
 - CRUD management for departments, subjects, students, exams, and administrators
 - Student roster import from CSV, XLS, and XLSX with previews, row-level errors, duplicate skipping, and atomic saves
+- Administrator DOB backfill from CSV, XLS, or XLSX using enrollment numbers, with preview and protection against overwriting existing dates
 - Timetable import from XLS, XLSX, text-based PDF, and scanned/image-only PDF via OCR
 - Import previews with validation errors, duplicate counts, and room/cohort conflict details
 - Separate `REGULAR` and `ABSENTEE` exam types

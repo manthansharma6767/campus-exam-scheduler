@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,14 +37,32 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
     boolean existsByEnrollmentNumberAndStudentIdNot(String enrollmentNumber, Long studentId);
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             UPDATE Student student
-            SET student.dateOfBirth = :dateOfBirth
+            SET student.dateOfBirth = :dateOfBirth,
+                student.dobUpdatedAt = :updatedAt,
+                student.dobUpdatedBy = :updatedBy
             WHERE student.studentId = :studentId
               AND student.dateOfBirth IS NULL
             """)
     int setDateOfBirthIfMissing(
             @Param("studentId") Long studentId,
-            @Param("dateOfBirth") LocalDate dateOfBirth);
+            @Param("dateOfBirth") LocalDate dateOfBirth,
+            @Param("updatedAt") LocalDateTime updatedAt,
+            @Param("updatedBy") String updatedBy);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            UPDATE Student student
+            SET student.dateOfBirth = :dateOfBirth,
+                student.dobUpdatedAt = :updatedAt,
+                student.dobUpdatedBy = :updatedBy
+            WHERE student.studentId = :studentId
+            """)
+    int overwriteDateOfBirth(
+            @Param("studentId") Long studentId,
+            @Param("dateOfBirth") LocalDate dateOfBirth,
+            @Param("updatedAt") LocalDateTime updatedAt,
+            @Param("updatedBy") String updatedBy);
 }

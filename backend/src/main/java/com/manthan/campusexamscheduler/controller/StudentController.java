@@ -36,14 +36,23 @@ public class StudentController {
 
     @PostMapping(value = "/dob-backfill/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<StudentDobBackfillPreviewResponse> previewStudentDobBackfill(
-            @RequestPart("file") MultipartFile file) {
-        return ResponseEntity.ok(studentImportService.previewStudentDobBackfill(file));
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(defaultValue = "false") boolean overwriteExisting) {
+        return ResponseEntity.ok(studentImportService.previewStudentDobBackfill(
+                file, overwriteExisting));
     }
 
     @PostMapping(value = "/dob-backfill", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<StudentDobBackfillResponse> backfillStudentDob(
-            @RequestPart("file") MultipartFile file) {
-        return ResponseEntity.ok(studentImportService.backfillStudentDob(file));
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(defaultValue = "false") boolean overwriteExisting,
+            @RequestParam(defaultValue = "false") boolean confirm,
+            Authentication authentication) {
+        return ResponseEntity.ok(studentImportService.backfillStudentDob(
+                file,
+                overwriteExisting,
+                confirm,
+                authentication == null ? "admin" : authentication.getName()));
     }
 
     @PostMapping

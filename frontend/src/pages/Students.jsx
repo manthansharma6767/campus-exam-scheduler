@@ -18,6 +18,8 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Alert from '@mui/material/Alert';
 import Tooltip from '@mui/material/Tooltip';
 import Snackbar from '@mui/material/Snackbar';
@@ -61,6 +63,8 @@ export default function Students() {
   const [dobBackfillError, setDobBackfillError] = useState('');
   const [dobBackfilling, setDobBackfilling] = useState(false);
   const [dobBackfillAction, setDobBackfillAction] = useState('');
+  const [dobOverwriteExisting, setDobOverwriteExisting] = useState(false);
+  const [dobBackfillConfirmOpen, setDobBackfillConfirmOpen] = useState(false);
   const [absenteeStudent, setAbsenteeStudent] = useState(null);
 
   const fetchData = async () => {
@@ -259,7 +263,9 @@ export default function Students() {
     try {
       const data = new FormData();
       data.append('file', dobBackfillFile);
-      const response = await api.post('/api/students/dob-backfill/preview', data);
+      const response = await api.post('/api/students/dob-backfill/preview', data, {
+        params: { overwriteExisting: dobOverwriteExisting },
+      });
       setDobBackfillPreview(response.data);
     } catch (err) {
       if (err.response?.data?.errors) setDobBackfillPreview(err.response.data);
@@ -272,17 +278,21 @@ export default function Students() {
 
   const handleDobBackfill = async () => {
     if (!dobBackfillFile || !dobBackfillPreview?.canApply) return;
+    setDobBackfillConfirmOpen(false);
     setDobBackfilling(true);
     setDobBackfillAction('apply');
     setDobBackfillError('');
     try {
       const data = new FormData();
       data.append('file', dobBackfillFile);
-      const response = await api.post('/api/students/dob-backfill', data);
+      const response = await api.post('/api/students/dob-backfill', data, {
+        params: { overwriteExisting: dobOverwriteExisting, confirm: true },
+      });
       setSnackbar({ open: true, message: response.data.message, severity: 'success' });
       setDobBackfillDialogOpen(false);
       setDobBackfillFile(null);
       setDobBackfillPreview(null);
+      setDobOverwriteExisting(false);
       fetchData();
     } catch (err) {
       if (err.response?.data?.errors) setDobBackfillPreview(err.response.data);
@@ -299,6 +309,8 @@ export default function Students() {
     setDobBackfillFile(null);
     setDobBackfillPreview(null);
     setDobBackfillError('');
+    setDobOverwriteExisting(false);
+    setDobBackfillConfirmOpen(false);
   };
 
   const closeImportDialog = () => {
@@ -331,7 +343,7 @@ export default function Students() {
           <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
               <Button id="backfill-student-dob-button" variant="outlined" startIcon={<UploadFileIcon />}
-                onClick={() => { setDobBackfillError(''); setDobBackfillPreview(null); setDobBackfillFile(null); setDobBackfillDialogOpen(true); }}
+                onClick={() => { setDobBackfillError(''); setDobBackfillPreview(null); setDobBackfillFile(null); setDobOverwriteExisting(false); setDobBackfillConfirmOpen(false); setDobBackfillDialogOpen(true); }}
                 sx={{ color: '#FFB74D', borderColor: 'rgba(255,183,77,0.5)', '&:hover': { borderColor: '#FFB74D', backgroundColor: 'rgba(255,183,77,0.08)' } }}>
                 Backfill DOB
               </Button>
@@ -451,7 +463,7 @@ export default function Students() {
           <DialogContent>
             {dobBackfillError && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{dobBackfillError}</Alert>}
             <Typography sx={{ color: 'text.secondary', mb: 2 }}>
-              Upload a CSV, XLS, or XLSX file with Enrollment Number and Date of Birth columns. Dates may use YYYY-MM-DD. Only students with a missing date of birth will be updated; existing dates are never overwritten.
+              Upload a CSV, XLS, or XLSX file with Enrollment Number and Date of Birth columns. Dates may use YYYY-MM-DD. Unmatched enrollment numbers block the whole update. Existing dates are preserved unless overwrite mode is enabled.
             </Typography>
             <Button onClick={downloadDobBackfillTemplate} sx={{ mb: 2, px: 0 }}>
               Download CSV template
@@ -476,8 +488,28 @@ export default function Students() {
                 {dobBackfillFile?.name || 'No file selected'}
               </Typography>
             </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={dobOverwriteExisting}
+                  onChange={(event) => {
+                    setDobOverwriteExisting(event.target.checked);
+                    setDobBackfillPreview(null);
+                    setDobBackfillError('');
+                  }}
+                  disabled={dobBackfilling}
+                />
+              }
+              label="Overwrite existing dates of birth"
+              sx={{ mt: 1.5, display: 'flex' }}
+            />
+            {dobOverwriteExisting && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                Overwrite mode replaces existing dates, including placeholders. Preview the file and confirm the final count before applying.
+              </Alert>
+            )}
             <Alert severity="info" sx={{ mt: 2 }}>
-              Preview checks the whole file first. Unmatched enrollment numbers and students who already have a date are skipped; duplicate enrollment numbers, missing dates, and invalid rows block all updates.
+              Preview checks the whole file first. Unmatched enrollment numbers, duplicate enrollment numbers, missing dates, and invalid rows block all updates. Existing dates are preserved unless overwrite mode is enabled.
             </Alert>
             <ImportPreviewPanel
               preview={dobBackfillPreview && {
@@ -485,9 +517,10 @@ export default function Students() {
                 canImport: dobBackfillPreview.canApply,
               }}
               counts={dobBackfillPreview && [
-                { label: `${dobBackfillPreview.eligibleRows} missing DOB(s) to backfill`, color: 'success' },
-                { label: `${dobBackfillPreview.alreadyPopulated} existing DOB(s) preserved` },
-                { label: `${dobBackfillPreview.notFound} unmatched enrollment number(s)` },
+                { label: `${dobBackfillPreview.eligibleRows} row(s) to update`, color: 'success' },
+                { label: `${dobBackfillPreview.missingDobRows} missing DOB(s)` },
+                { label: `${dobBackfillPreview.existingDobRows} existing DOB(s)${dobBackfillPreview.overwriteExisting ? ' to overwrite' : ' preserved'}`, color: dobBackfillPreview.overwriteExisting ? 'warning' : 'default' },
+                { label: `${dobBackfillPreview.notFound} unmatched enrollment number(s)`, color: dobBackfillPreview.notFound ? 'error' : 'default' },
                 { label: `${dobBackfillPreview.errors?.length || 0} row error(s)`, color: dobBackfillPreview.errors?.length ? 'error' : 'default' },
               ]}
             />
@@ -498,12 +531,24 @@ export default function Students() {
               sx={{ borderColor: '#FF8F00', color: '#FFB300' }}>
               {dobBackfilling && dobBackfillAction === 'preview' ? 'Checking...' : 'Preview backfill'}
             </Button>
-            <Button onClick={handleDobBackfill} variant="contained" disabled={dobBackfilling || !dobBackfillFile || !dobBackfillPreview?.canApply}
+            <Button onClick={() => setDobBackfillConfirmOpen(true)} variant="contained" disabled={dobBackfilling || !dobBackfillFile || !dobBackfillPreview?.canApply}
               sx={{ background: 'linear-gradient(135deg, #E65100 0%, #FF6D00 100%)', '&:hover': { background: 'linear-gradient(135deg, #BF360C 0%, #E65100 100%)' } }}>
               {dobBackfilling && dobBackfillAction === 'apply' ? 'Backfilling...' : 'Confirm backfill'}
             </Button>
           </DialogActions>
         </Dialog>
+
+        <ConfirmDialog
+          open={dobBackfillConfirmOpen}
+          title="Apply DOB Backfill"
+          message={`This will update ${dobBackfillPreview?.eligibleRows || 0} student date(s) of birth${dobBackfillPreview?.overwriteExisting
+            ? `, including ${dobBackfillPreview?.existingDobRows || 0} existing date(s)`
+            : ''}. This action cannot be undone without another explicit backfill.`}
+          confirmLabel="Backfill"
+          confirmColor="warning"
+          onConfirm={handleDobBackfill}
+          onCancel={() => setDobBackfillConfirmOpen(false)}
+        />
 
         <AbsenteeEligibilityDialog
           open={Boolean(absenteeStudent)}

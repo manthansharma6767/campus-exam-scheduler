@@ -78,7 +78,7 @@ CREATE TABLE seat_assignments (
     column_number INT NOT NULL,
     roll_number VARCHAR(20) NOT NULL,
     room_number VARCHAR(30) NOT NULL,
-    row_number INT NOT NULL,
+    `row_number` INT NOT NULL,
     section_name VARCHAR(10) NULL,
     source_page INT NOT NULL,
     seating_plan_id BIGINT NOT NULL,

@@ -36,3 +36,13 @@ build/
 .env
 .env.*
 !.env.example
+
+# Local run logs and one-off helper scripts.
+*.log
+/VERIFICATION_SUMMARY.md
+/extract_images.bat
+/extract_info.bat
+/extract_text.bat
+/start_backend.bat
+/start_backend_mvn.bat
+/start_frontend.bat

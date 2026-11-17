@@ -7,7 +7,16 @@ import Button from '@mui/material/Button';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import Box from '@mui/material/Box';
 
-export default function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
+export default function ConfirmDialog({
+  open,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmLabel = 'Delete',
+  confirmColor = 'error',
+  cancelLabel = 'Cancel',
+}) {
   return (
     <Dialog
       open={open}
@@ -36,15 +45,15 @@ export default function ConfirmDialog({ open, title, message, onConfirm, onCance
           aria-label="Cancel action"
           sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#B0B0B0' }}
         >
-          Cancel
+          {cancelLabel}
         </Button>
         <Button
           onClick={onConfirm}
           variant="contained"
-          color="error"
+          color={confirmColor}
           aria-label="Confirm action"
         >
-          Delete
+          {confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

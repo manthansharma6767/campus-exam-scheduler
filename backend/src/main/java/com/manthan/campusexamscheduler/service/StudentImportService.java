@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -78,35 +79,72 @@ public class StudentImportService {
     }
 
     @Transactional(readOnly = true)
-    public StudentDobBackfillPreviewResponse previewStudentDobBackfill(MultipartFile file) {
-        return toDobBackfillPreview(analyzeStudentDobBackfill(file));
+    public StudentDobBackfillPreviewResponse previewStudentDobBackfill(
+            MultipartFile file, boolean overwriteExisting) {
+        return toDobBackfillPreview(
+                analyzeStudentDobBackfill(file, overwriteExisting), overwriteExisting);
     }
 
     @Transactional
-    public StudentDobBackfillResponse backfillStudentDob(MultipartFile file) {
-        StudentDobBackfillAnalysis analysis = analyzeStudentDobBackfill(file);
-        StudentDobBackfillPreviewResponse preview = toDobBackfillPreview(analysis);
+    public StudentDobBackfillResponse backfillStudentDob(
+            MultipartFile file, boolean overwriteExisting, boolean confirmed, String updatedBy) {
+        if (!confirmed) {
+            throw new IllegalArgumentException(
+                    "Confirm the date-of-birth backfill before applying it.");
+        }
+
+        StudentDobBackfillAnalysis analysis = analyzeStudentDobBackfill(file, overwriteExisting);
+        StudentDobBackfillPreviewResponse preview =
+                toDobBackfillPreview(analysis, overwriteExisting);
         if (!preview.canApply()) {
             throw new StudentDobBackfillValidationException(preview);
         }
 
-        int updated = analysis.candidates().stream()
-                .mapToInt(candidate -> studentRepository.setDateOfBirthIfMissing(
-                        candidate.student().getStudentId(), candidate.dateOfBirth()))
-                .sum();
-        int alreadyPopulated = analysis.alreadyPopulated() + analysis.candidates().size() - updated;
+        String actor = updatedBy == null || updatedBy.isBlank() ? "admin" : updatedBy;
+        LocalDateTime updatedAt = LocalDateTime.now();
+        int missingUpdated = 0;
+        int overwritten = 0;
+        for (StudentDobCandidate candidate : analysis.candidates()) {
+            if (candidate.existingDob()) {
+                overwritten += studentRepository.overwriteDateOfBirth(
+                        candidate.student().getStudentId(),
+                        candidate.dateOfBirth(),
+                        updatedAt,
+                        actor);
+            } else {
+                missingUpdated += studentRepository.setDateOfBirthIfMissing(
+                        candidate.student().getStudentId(),
+                        candidate.dateOfBirth(),
+                        updatedAt,
+                        actor);
+            }
+        }
+
+        int preservedExisting = analysis.existingDobRows() - overwritten;
+        int concurrentlySet = analysis.missingDobRows() - missingUpdated;
+        int updated = missingUpdated + overwritten;
+        String message = "Backfilled " + missingUpdated + " missing date(s) of birth";
+        if (overwriteExisting) {
+            message += " and overwrote " + overwritten + " existing date(s)";
+        }
+        message += "; preserved " + preservedExisting + " existing date(s)";
+        if (concurrentlySet > 0) {
+            message += " and skipped " + concurrentlySet
+                    + " date(s) that were set by another request";
+        }
+        message += ".";
 
         return new StudentDobBackfillResponse(
                 updated,
-                alreadyPopulated,
+                overwritten,
+                preservedExisting,
                 analysis.notFound(),
                 analysis.totalRows(),
-                "Backfilled " + updated + " student date(s) of birth; "
-                        + "preserved " + alreadyPopulated + " existing date(s) and skipped "
-                        + analysis.notFound() + " unmatched enrollment number(s).");
+                message);
     }
 
-    private StudentDobBackfillAnalysis analyzeStudentDobBackfill(MultipartFile file) {
+    private StudentDobBackfillAnalysis analyzeStudentDobBackfill(
+            MultipartFile file, boolean overwriteExisting) {
         List<String[]> rows = readStudentRows(file);
         int headerRow = findHeaderRow(rows, DOB_BACKFILL_HEADERS);
         if (headerRow < 0 || rows.size() <= headerRow + 1) {
@@ -119,7 +157,8 @@ public class StudentImportService {
         List<ImportPreviewRow> previewRows = new ArrayList<>();
         List<ImportRowError> errors = new ArrayList<>();
         Set<String> seenEnrollmentNumbers = new HashSet<>();
-        int alreadyPopulated = 0;
+        int missingDobRows = 0;
+        int existingDobRows = 0;
         int notFound = 0;
         int totalRows = 0;
 
@@ -153,20 +192,34 @@ public class StudentImportService {
                         studentRepository.findByEnrollmentNumberIgnoreCase(enrollmentNumber);
 
                 String status;
+                LocalDate currentDateOfBirth = matchingStudent
+                        .map(Student::getDateOfBirth)
+                        .orElse(null);
                 if (matchingStudent.isEmpty()) {
                     notFound++;
                     status = "Student not found";
-                } else if (matchingStudent.get().getDateOfBirth() != null) {
-                    alreadyPopulated++;
-                    status = "DOB already set; unchanged";
+                } else if (currentDateOfBirth != null) {
+                    existingDobRows++;
+                    if (overwriteExisting) {
+                        candidates.add(new StudentDobCandidate(
+                                matchingStudent.get(), dateOfBirth, true));
+                        status = "Will overwrite existing DOB";
+                    } else {
+                        status = "DOB already set; unchanged";
+                    }
                 } else {
-                    candidates.add(new StudentDobCandidate(matchingStudent.get(), dateOfBirth));
+                    missingDobRows++;
+                    candidates.add(new StudentDobCandidate(
+                            matchingStudent.get(), dateOfBirth, false));
                     status = "Will backfill";
                 }
 
                 Map<String, String> values = new LinkedHashMap<>();
                 values.put("Enrollment Number", enrollmentNumber);
                 values.put("Date of Birth", dateOfBirth.toString());
+                if (currentDateOfBirth != null) {
+                    values.put("Current DOB", currentDateOfBirth.toString());
+                }
                 values.put("Result", status);
                 previewRows.add(new ImportPreviewRow(rowNumber, values));
             } catch (IllegalArgumentException exception) {
@@ -178,29 +231,41 @@ public class StudentImportService {
             errors.add(new ImportRowError(headerRow + 2, "No student rows were found in the file."));
         }
         return new StudentDobBackfillAnalysis(
-                candidates, alreadyPopulated, notFound, totalRows, errors, previewRows);
+                candidates, missingDobRows, existingDobRows, notFound,
+                totalRows, errors, previewRows);
     }
 
     private StudentDobBackfillPreviewResponse toDobBackfillPreview(
-            StudentDobBackfillAnalysis analysis) {
-        boolean canApply = analysis.errors().isEmpty() && !analysis.candidates().isEmpty();
+            StudentDobBackfillAnalysis analysis, boolean overwriteExisting) {
+        boolean canApply = analysis.errors().isEmpty()
+                && analysis.notFound() == 0
+                && !analysis.candidates().isEmpty();
         String message;
         if (!analysis.errors().isEmpty()) {
             message = "Fix the listed row errors before backfilling. No dates of birth were changed.";
+        } else if (analysis.notFound() > 0) {
+            message = "Fix " + analysis.notFound()
+                    + " unmatched enrollment number(s) before backfilling. No dates of birth were changed.";
         } else if (canApply) {
-            message = "Ready to backfill " + analysis.candidates().size() + " student(s); preserved "
-                    + analysis.alreadyPopulated() + " existing date(s) and skipped " + analysis.notFound()
-                    + " unmatched enrollment number(s).";
+            message = "Ready to update " + analysis.candidates().size()
+                    + " student date(s) of birth";
+            if (overwriteExisting && analysis.existingDobRows() > 0) {
+                message += ", including " + analysis.existingDobRows()
+                        + " existing date(s)";
+            }
+            message += "; " + analysis.missingDobRows() + " missing date(s) will be filled.";
         } else {
-            message = "No missing dates of birth were found to backfill; preserved "
-                    + analysis.alreadyPopulated() + " existing date(s) and skipped " + analysis.notFound()
-                    + " unmatched enrollment number(s).";
+            message = "No dates of birth are eligible for backfilling; preserved "
+                    + analysis.existingDobRows() + " existing date(s).";
         }
 
         return new StudentDobBackfillPreviewResponse(
+                analysis.totalRows(),
                 analysis.candidates().size(),
-                analysis.alreadyPopulated(),
+                analysis.missingDobRows(),
+                analysis.existingDobRows(),
                 analysis.notFound(),
+                overwriteExisting,
                 canApply,
                 analysis.previewRows().size() > MAX_PREVIEW_ROWS,
                 analysis.previewRows().stream().limit(MAX_PREVIEW_ROWS).toList(),
@@ -208,10 +273,12 @@ public class StudentImportService {
                 message);
     }
 
-    private record StudentDobCandidate(Student student, LocalDate dateOfBirth) { }
+    private record StudentDobCandidate(
+            Student student, LocalDate dateOfBirth, boolean existingDob) { }
     private record StudentDobBackfillAnalysis(
             List<StudentDobCandidate> candidates,
-            int alreadyPopulated,
+            int missingDobRows,
+            int existingDobRows,
             int notFound,
             int totalRows,
             List<ImportRowError> errors,
@@ -355,8 +422,9 @@ public class StudentImportService {
         for (DateTimeFormatter format : formats) {
             try {
                 LocalDate date = LocalDate.parse(value, format);
-                if (date.isAfter(LocalDate.now())) {
-                    throw new IllegalArgumentException("date of birth cannot be in the future");
+                if (!date.isBefore(LocalDate.now())) {
+                    throw new IllegalArgumentException(
+                            "date of birth must be in the past");
                 }
                 return date;
             } catch (DateTimeParseException ignored) {

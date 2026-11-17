@@ -57,10 +57,11 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Flyway schema migrations -->
+        <!-- Flyway schema migrations. Spring Boot 4 requires the modular
+             starter for Flyway auto-configuration. -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

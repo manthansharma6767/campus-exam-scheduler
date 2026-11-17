@@ -6,6 +6,7 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "students")
@@ -57,6 +58,12 @@ public class Student {
     @Past
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
+
+    @Column(name = "dob_updated_at")
+    private LocalDateTime dobUpdatedAt;
+
+    @Column(name = "dob_updated_by", length = 255)
+    private String dobUpdatedBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", nullable = false)

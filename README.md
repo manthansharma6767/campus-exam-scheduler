@@ -12,7 +12,7 @@ Campus Exam Scheduler is a full-stack application for publishing university exam
 - Stateless JWT authentication for the administration area
 - CRUD management for departments, subjects, students, exams, and administrators
 - Student roster import from CSV, XLS, and XLSX with previews, row-level errors, duplicate skipping, and atomic saves
-- Administrator DOB backfill from CSV, XLS, or XLSX using enrollment numbers, with preview and protection against overwriting existing dates
+- Administrator DOB backfill from CSV, XLS, or XLSX using enrollment numbers, with preview, unmatched-row blocking, explicit overwrite mode, final confirmation, and audit fields
 - Timetable import from XLS, XLSX, text-based PDF, and scanned/image-only PDF via OCR
 - Import previews with validation errors, duplicate counts, and room/cohort conflict details
 - Separate `REGULAR` and `ABSENTEE` exam types
@@ -58,7 +58,7 @@ Campus Exam Scheduler is a full-stack application for publishing university exam
 |   |   |-- service/         # business logic, imports, verification
 |   |   |-- repository/      # Spring Data repositories
 |   |   `-- entity/          # JPA entities
-|   |-- src/main/resources/db/migration/   # Flyway V1 and V2
+|   |-- src/main/resources/db/migration/   # Flyway V1 through V3
 |   |-- src/test/java/...                   # integration and import tests
 |   |-- Dockerfile
 |   `-- mvnw, mvnw.cmd
@@ -183,18 +183,21 @@ Flyway is the source of truth for schema changes:
 
 - `V1__baseline_schema.sql` creates the baseline tables for a fresh installation.
 - `V2__student_dob_and_absentee_audit.sql` adds `students.date_of_birth` and the `source`, `locked`, `updated_at`, and `updated_by` audit fields on absentee assignments.
+- `V3__student_dob_audit.sql` adds `students.dob_updated_at` and `students.dob_updated_by` so DOB backfill changes are attributable.
 
 The application uses `spring.jpa.hibernate.ddl-auto=validate`. Do not change it to `update` or `create`; Hibernate should validate Flyway's schema, not modify it.
+
+Spring Boot 4 auto-configures Flyway only when the modular `spring-boot-starter-flyway` dependency is present. Keep it in `backend/pom.xml`; `flyway-core` alone does not run migrations at startup.
 
 For an existing database:
 
 1. Take a verified backup before starting the application.
 2. Confirm the current `flyway_schema_history` state if the database has been migrated before.
-3. Start the backend and review the Flyway log. An existing schema without Flyway history is baselined at V1 and then receives V2.
+3. Start the backend and review the Flyway log. An existing schema without Flyway history is baselined at V1 and then receives V2 and V3.
 
-If a legacy schema already contains the V2 columns but has no Flyway history, V2 will fail. Restore the backup and reconcile the baseline and migration history with a database administrator rather than deleting data or editing an applied migration.
+If a legacy schema already contains the V2 or V3 columns but has no Flyway history, the corresponding migration will fail. Restore the backup and reconcile the baseline and migration history with a database administrator rather than deleting data or editing an applied migration.
 
-Do not edit a migration that has already been applied. Flyway validates checksums. Add a new `V3__...sql` migration instead. The files in `database/migrations/` are legacy manual snippets retained for reference; the authoritative migration path is `backend/src/main/resources/db/migration/`.
+Do not edit a migration that has already been applied. Flyway validates checksums. Add a new `V4__...sql` migration instead. The files in `database/migrations/` are legacy manual snippets retained for reference; the authoritative migration path is `backend/src/main/resources/db/migration/`.
 
 `database/demo-data.sql` is optional, inserts synthetic records only, and is not executed automatically. Do not run it against production data.
 
@@ -228,6 +231,25 @@ Open **Student Management -> Import Students** and upload a CSV, XLS, or XLSX fi
 Common header aliases are accepted, including `Roll No`, `Enrollment`, `Dept`, `DOB`, and `Registration Number`. The preview hides passwords, reports row-level errors, and shows the number of records that will be saved. Duplicate emails and enrollment numbers in the file or database are skipped. If any row has a validation error, the import is rejected without partial writes.
 
 Populate dates of birth for existing students before enabling self-service. A student without a stored date of birth cannot complete enrollment verification, even if all other fields are present.
+
+### Date-of-birth backfill
+
+Open **Student Management -> Backfill DOB** and upload a CSV, XLS, or XLSX file containing only these columns:
+
+| Column | Required | Notes |
+| --- | --- | --- |
+| Enrollment Number | Yes | Must match an existing student exactly, ignoring case |
+| Date of Birth | Yes | `YYYY-MM-DD` or another supported date format; must be in the past |
+
+The preview reports rows that will be filled, existing dates, unmatched enrollment numbers, and row errors. The apply button stays disabled until the whole file is valid:
+
+- **Unmatched enrollment numbers block the entire apply.** Fix typos and re-preview; no dates are changed.
+- **Existing dates are preserved by default.** Enable **Overwrite existing dates of birth** only when placeholders or incorrect dates must be replaced. The preview then marks those rows as `Will overwrite existing DOB`.
+- **A final confirmation dialog** shows how many rows will change. The backend also requires `confirm=true` on the apply request.
+- **Audit fields:** every backfill write records `dob_updated_at` and `dob_updated_by` from the signed-in administrator.
+- Invalid rows, duplicate enrollment numbers, and missing dates block all updates. No partial writes occur.
+
+For a demo environment, synthetic dates may be generated to exercise the workflow. Never use synthetic dates in a production examination cycle; obtain official registrar data and take a database backup before applying it.
 
 ### Timetable import
 
@@ -289,6 +311,7 @@ All endpoints return JSON unless noted. Multipart endpoints accept a `file` part
 | Student absentee eligibility | `GET` and `PUT /api/students/{enrollmentNumber}/absentee-eligibility` | Requires `X-Student-Verification` for the same enrollment number |
 | Administrator absentee management | `GET` and `PUT /api/students/{studentId}/absentee-exams` | Administrator JWT |
 | Student import | `POST /api/students/import/preview`, `POST /api/students/import` | Administrator JWT; multipart CSV/XLS/XLSX |
+| DOB backfill | `POST /api/students/dob-backfill/preview?overwriteExisting=false`, `POST /api/students/dob-backfill?overwriteExisting=false&confirm=true` | Administrator JWT; multipart CSV/XLS/XLSX; unmatched rows block apply; `confirm=true` is required |
 | Timetable import | `POST /api/exams/import/preview`, `POST /api/exams/import` | Administrator JWT; multipart XLS/XLSX/PDF; optional `examType` of `REGULAR` or `ABSENTEE` |
 | Seating import | `POST /api/seating/plans/import` | Administrator JWT; multipart PDF; optional `title` |
 | Public seating | `GET /api/seating/plans`, `GET /api/seating/plans/{planId}/roll/{rollNumber}` | Public |
@@ -309,6 +332,7 @@ Swagger UI is available while the backend is running at `http://localhost:8080/s
 | First-administrator bootstrap | Requires `X-Admin-Setup-Token`; constant-time token comparison; rejected once an administrator exists |
 | CORS | Exact configured origins; default local origins are `http://localhost:5173` and `http://localhost:5174` |
 | Uploads | 10 MB maximum request and file size |
+| DOB backfill | Preview required; unmatched rows block apply; overwrite mode and `confirm=true` are explicit; changes record `dob_updated_at` and `dob_updated_by` |
 | Schema changes | Flyway migrations; Hibernate `ddl-auto=validate` |
 
 Operational expectations:
@@ -322,7 +346,7 @@ Operational expectations:
 
 ### Known limitations
 
-- **Date-of-birth backfill:** Self-service absentee management only works for students with a stored `date_of_birth`. Existing records without one must be updated by an administrator or a controlled data backfill before those students can verify.
+- **Date-of-birth backfill:** Self-service absentee management only works for students with a stored `date_of_birth`. Use **Student Management -> Backfill DOB** to fill missing dates. Unmatched enrollment numbers block the file, and overwriting an existing date requires the explicit overwrite mode and final confirmation. Backfill writes record the administrator and timestamp.
 - **No immediate JWT revocation:** Changing an administrator password does not invalidate JWTs already issued to that account; they remain valid until their 24-hour expiry. Rotating `JWT_SECRET` invalidates all tokens and signs every administrator out.
 - **Process-local rate limiting:** The failure limiter is held in memory. A multi-instance deployment needs a shared store such as Redis or rate limiting at the API gateway.
 - **Replace-all administrator saves:** Administrator absentee saves replace the complete assignment set. Concurrent edits can overwrite each other, so refresh before saving when multiple administrators may be working on the same student.
@@ -348,7 +372,7 @@ Set-Location backend
 .\mvnw.cmd test
 ```
 
-The test URL must target exactly the `campus_exam_scheduler` database, must not embed credentials, and must not use `createDatabaseIfNotExist`. The suite covers authentication and rate limiting, student verification, absentee lock semantics, timetable import, conflict detection, and test-database guardrails. There is no checked-in CI workflow; wire these commands into your pipeline.
+The test URL must target exactly the `campus_exam_scheduler` database, must not embed credentials, and must not use `createDatabaseIfNotExist`. The suite covers authentication and rate limiting, student verification, absentee lock semantics, DOB backfill repository and endpoint behavior, timetable import, conflict detection, and test-database guardrails. There is no checked-in CI workflow; wire these commands into your pipeline.
 
 ### Frontend checks
 
@@ -399,13 +423,16 @@ Build the frontend with `npm ci && npm run build`, then serve `frontend/dist/` f
 | --- | --- |
 | Backend fails at startup with a missing `JWT_SECRET` value | Set `JWT_SECRET` in the backend process environment |
 | `Communications link failure` or access denied | Confirm MySQL is running, the database exists, and the URL and credentials are correct |
-| `Schema-validation` failure or missing column | Confirm Flyway ran successfully and the database matches the migrations; do not switch to `ddl-auto=update` |
+| `Schema-validation` failure or missing column | Confirm Flyway ran successfully and the database matches the migrations; verify `spring-boot-starter-flyway` is present, and do not switch to `ddl-auto=update` |
 | Flyway checksum or validation failure | Do not edit applied migrations; restore from backup or add a new migration after reviewing `flyway_schema_history` |
 | Administrator receives `401` | The token may be expired, malformed, or signed with a different `JWT_SECRET`; sign in again |
 | Login or verification returns `429` | Wait for the `Retry-After` period; the limiter allows 5 failures per 15 minutes |
 | Browser blocks an API request with a CORS error | Add the exact frontend origin, including scheme and port, to `CORS_ALLOWED_ORIGINS` |
 | Vite opened on port 5174 and API calls fail | Add `http://localhost:5174` to `CORS_ALLOWED_ORIGINS` |
 | Student verification always fails | Confirm the student has a `date_of_birth` set and the submitted date matches exactly |
+| DOB backfill preview reports unmatched enrollment numbers | Fix the enrollment numbers in the file; unmatched rows block the entire apply |
+| DOB backfill confirm button is disabled | Preview the file first and resolve every row error or unmatched enrollment number |
+| Flyway fails on `dob_updated_at` or `dob_updated_by` | Apply `V3__student_dob_audit.sql` through normal backend startup; do not add the columns manually without reconciling Flyway history |
 | Scanned PDF import says OCR is unavailable | Install Tesseract, set `TESSERACT_CMD`, or use a text-based PDF or Excel file |
 | Backend tests reject the test database | Use a URL ending in `/campus_exam_scheduler`; separate test schemas are intentionally rejected |
 

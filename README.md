@@ -372,7 +372,7 @@ Set-Location backend
 .\mvnw.cmd test
 ```
 
-The test URL must target exactly the `campus_exam_scheduler` database, must not embed credentials, and must not use `createDatabaseIfNotExist`. The suite covers authentication and rate limiting, student verification, absentee lock semantics, DOB backfill repository and endpoint behavior, timetable import, conflict detection, and test-database guardrails. There is no checked-in CI workflow; wire these commands into your pipeline.
+The test URL must target exactly the `campus_exam_scheduler` database, must not embed credentials, and must not use `createDatabaseIfNotExist`. The suite covers authentication and rate limiting, student verification, absentee lock semantics, DOB backfill repository and endpoint behavior, timetable import, conflict detection, and test-database guardrails. The checked-in GitHub Actions workflow applies the Flyway migrations to a MySQL 8.0 service and runs this suite on every pull request and every push to `main`.
 
 ### Frontend checks
 
@@ -383,6 +383,17 @@ npm run build
 ```
 
 The production build is written to `frontend/dist/`. To preview it locally, run `npm run preview`.
+
+### Continuous integration
+
+Every pull request to `main` must pass two required checks:
+
+| Check | What it runs |
+| --- | --- |
+| `backend` | MySQL 8.0 service, Flyway migrations V1–V3, `./mvnw test` |
+| `frontend` | `npm ci`, `npm run lint`, `npm run build` |
+
+The workflow is defined in `.github/workflows/ci.yml`. Branch protection on `main` requires a pull request and both checks, so direct pushes, force pushes, and branch deletion are blocked. New pull requests start from `.github/pull_request_template.md`.
 
 ## Build and deployment
 
@@ -438,12 +449,14 @@ Build the frontend with `npm ci && npm run build`, then serve `frontend/dist/` f
 
 ## Contributing
 
-Before opening a pull request:
+Create a branch from `main` and open a pull request; never commit or push directly to `main`. Before opening a pull request:
 
 1. Run the backend tests with explicit test credentials.
 2. Run `npm run lint` and `npm run build` in `frontend/`.
 3. Keep schema changes additive and add a new Flyway migration rather than editing an applied one.
 4. Do not commit `.env` files, logs, generated build output, setup tokens, JWT secrets, or real student data.
+
+CI runs the same backend and frontend checks automatically. Both must pass before the pull request can be merged.
 
 ## License
 

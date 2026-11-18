@@ -241,7 +241,10 @@ export default function SearchResult() {
                       size="small"
                       variant="outlined"
                       startIcon={<EventBusyIcon />}
-                      onClick={() => setAbsenteeDialogOpen(true)}
+                      onClick={() => {
+                        setNotice('');
+                        setAbsenteeDialogOpen(true);
+                      }}
                       sx={{
                         borderColor: 'rgba(255, 143, 0, 0.7)',
                         color: '#FFB300',

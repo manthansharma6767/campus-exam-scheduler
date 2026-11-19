@@ -37,12 +37,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
           cache: maven
           cache-dependency-path: backend/pom.xml
+
+      - name: Cache Maven wrapper distribution
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper/dists
+          key: maven-wrapper-${{ runner.os }}-${{ hashFiles('backend/.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: |
+            maven-wrapper-${{ runner.os }}-
 
       - name: Apply Flyway migrations
         env:

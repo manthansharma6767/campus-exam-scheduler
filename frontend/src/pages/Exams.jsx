@@ -71,9 +71,9 @@ export default function Exams() {
   const [importExamType, setImportExamType] = useState('REGULAR');
   const [filters, setFilters] = useState({
     query: '',
-    departmentId: '',
-    semester: '',
-    examType: '',
+    departmentId: 'all',
+    semester: 'all',
+    examType: 'all',
     sort: 'date-asc',
   });
 
@@ -110,9 +110,9 @@ export default function Exams() {
   const filteredExams = exams
     .filter((exam) => {
       const subject = subjectById.get(exam.subjectId);
-      if (filters.departmentId && String(subject?.departmentId) !== filters.departmentId) return false;
-      if (filters.semester && String(subject?.semester) !== filters.semester) return false;
-      if (filters.examType && (exam.examType || 'REGULAR') !== filters.examType) return false;
+      if (filters.departmentId !== 'all' && String(subject?.departmentId) !== filters.departmentId) return false;
+      if (filters.semester !== 'all' && String(subject?.semester) !== filters.semester) return false;
+      if (filters.examType !== 'all' && (exam.examType || 'REGULAR') !== filters.examType) return false;
       if (!normalizedQuery) return true;
       return [
         exam.subjectName,
@@ -135,7 +135,7 @@ export default function Exams() {
   };
 
   const clearFilters = () => {
-    setFilters({ query: '', departmentId: '', semester: '', examType: '', sort: 'date-asc' });
+    setFilters({ query: '', departmentId: 'all', semester: 'all', examType: 'all', sort: 'date-asc' });
   };
 
   const handleChange = (e) => {
@@ -320,19 +320,19 @@ export default function Exams() {
                     sx={{ flex: '1 1 240px', minWidth: 220 }}
                   />
                   <TextField select size="small" label="Department" name="departmentId" value={filters.departmentId} onChange={updateFilter} sx={{ minWidth: 220 }}>
-                    <MenuItem value="">All departments</MenuItem>
+                    <MenuItem value="all">All departments</MenuItem>
                     {departments.map((department) => (
                       <MenuItem key={department.id} value={department.id}>{department.name}</MenuItem>
                     ))}
                   </TextField>
                   <TextField select size="small" label="Semester" name="semester" value={filters.semester} onChange={updateFilter} sx={{ minWidth: 130 }}>
-                    <MenuItem value="">All semesters</MenuItem>
+                    <MenuItem value="all">All semesters</MenuItem>
                     {semesters.map((semester) => (
                       <MenuItem key={semester} value={String(semester)}>Semester {semester}</MenuItem>
                     ))}
                   </TextField>
                   <TextField select size="small" label="Type" name="examType" value={filters.examType} onChange={updateFilter} sx={{ minWidth: 140 }}>
-                    <MenuItem value="">All types</MenuItem>
+                    <MenuItem value="all">All types</MenuItem>
                     <MenuItem value="REGULAR">Regular</MenuItem>
                     <MenuItem value="ABSENTEE">Absentee</MenuItem>
                   </TextField>

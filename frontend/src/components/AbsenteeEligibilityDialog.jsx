@@ -19,6 +19,11 @@ import EventBusyIcon from '@mui/icons-material/EventBusy';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import api from '../services/api';
+import {
+  clearStudentVerification,
+  readStudentVerification,
+  saveStudentVerification,
+} from '../utils/studentVerification';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -72,10 +77,10 @@ export default function AbsenteeEligibilityDialog({
     setExams([]);
     setSelected(new Set());
     setLocked(new Set());
-    setVerification(null);
+    setVerification(selfService ? readStudentVerification(enrollmentNumber) : null);
     setDateOfBirth('');
     setError('');
-  }, [open, endpoint]);
+  }, [open, endpoint, selfService, enrollmentNumber]);
 
   useEffect(() => {
     if (!open || !endpoint) return undefined;
@@ -104,6 +109,7 @@ export default function AbsenteeEligibilityDialog({
       } catch (err) {
         if (cancelled) return;
         if (selfService && err.response?.status === 401) {
+          clearStudentVerification();
           setVerification(null);
         }
         setError(err.response?.data?.message || 'Failed to load absentee papers.');
@@ -128,6 +134,11 @@ export default function AbsenteeEligibilityDialog({
       const response = await api.post(
         `/api/students/${encodeURIComponent(enrollmentNumber || '')}/verify`,
         { dateOfBirth }
+      );
+      saveStudentVerification(
+        enrollmentNumber,
+        response.data.token,
+        response.data.expiresInSeconds
       );
       setVerification({
         token: response.data.token,
@@ -212,7 +223,13 @@ export default function AbsenteeEligibilityDialog({
       onSaved?.();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save absentee papers.');
+      if (selfService && err.response?.status === 401) {
+        clearStudentVerification();
+        setVerification(null);
+        setError('Your verification expired. Enter your date of birth again.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to save absentee papers.');
+      }
     } finally {
       setSaving(false);
     }

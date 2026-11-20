@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Box from '@mui/material/Box';
+import Checkbox from '@mui/material/Checkbox';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Grid from '@mui/material/Grid';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
@@ -16,13 +18,39 @@ import EventBusyIcon from '@mui/icons-material/EventBusy';
 import ExamCard from '../components/ExamCard';
 import { downloadCalendar, getExamKey, readPersonalSchedule, removeExamFromPersonalSchedule } from '../utils/personalSchedule';
 
+const DURATION_STORAGE_KEY = 'calendar_fallback_duration';
+const DURATION_OPTIONS = [60, 90, 120, 180, 240];
+
+function readStoredDuration() {
+  try {
+    const stored = Number(localStorage.getItem(DURATION_STORAGE_KEY));
+    return DURATION_OPTIONS.includes(stored) ? stored : 180;
+  } catch {
+    return 180;
+  }
+}
+
 export default function MySchedule() {
   const [exams, setExams] = useState([]);
-  const [duration, setDuration] = useState(180);
+  const [duration, setDuration] = useState(readStoredDuration);
+  const [regularOnly, setRegularOnly] = useState(false);
 
   useEffect(() => setExams(readPersonalSchedule()), []);
 
   const removeExam = (exam) => setExams(removeExamFromPersonalSchedule(exam, exam.enrollmentNumber));
+  const visibleExams = regularOnly
+    ? exams.filter((exam) => (exam.examType || 'REGULAR') === 'REGULAR')
+    : exams;
+
+  const handleDurationChange = (event) => {
+    const minutes = Number(event.target.value);
+    setDuration(minutes);
+    try {
+      localStorage.setItem(DURATION_STORAGE_KEY, String(minutes));
+    } catch {
+      // The preference is a convenience; exporting still works without it.
+    }
+  };
 
   return (
     <Fade in timeout={600}>
@@ -56,24 +84,57 @@ export default function MySchedule() {
             ) : (
               <>
                 <Box sx={{ display: 'flex', alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 3 }}>
-                  <Typography variant="h5" sx={{ color: '#FFB300', fontWeight: 700 }}>{exams.length} saved exam{exams.length === 1 ? '' : 's'}</Typography>
+                  <Typography variant="h5" sx={{ color: '#FFB300', fontWeight: 700 }}>
+                    {regularOnly
+                      ? `${visibleExams.length} of ${exams.length} saved exam${exams.length === 1 ? '' : 's'}`
+                      : `${exams.length} saved exam${exams.length === 1 ? '' : 's'}`}
+                  </Typography>
                   <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <TextField select size="small" label="Fallback duration" value={duration} onChange={(event) => setDuration(Number(event.target.value))} sx={{ minWidth: 170 }}>
-                      {[60, 90, 120, 180, 240].map((minutes) => <MenuItem key={minutes} value={minutes}>{minutes / 60} hour{minutes === 60 ? '' : 's'}</MenuItem>)}
+                    <FormControlLabel
+                      control={(
+                        <Checkbox
+                          checked={regularOnly}
+                          onChange={(event) => setRegularOnly(event.target.checked)}
+                          sx={{ color: '#FF8F00', '&.Mui-checked': { color: '#FF8F00' } }}
+                        />
+                      )}
+                      label="Regular papers only"
+                      sx={{ color: '#E0E0E0', mr: 0 }}
+                    />
+                    <TextField select size="small" label="Fallback duration" value={duration} onChange={handleDurationChange} sx={{ minWidth: 170 }}>
+                      {DURATION_OPTIONS.map((minutes) => <MenuItem key={minutes} value={minutes}>{minutes / 60} hour{minutes === 60 ? '' : 's'}</MenuItem>)}
                     </TextField>
-                    <Button variant="contained" startIcon={<DownloadIcon />} onClick={() => downloadCalendar(exams, duration)}>
+                    <Button
+                      variant="contained"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => downloadCalendar(visibleExams, duration)}
+                      disabled={visibleExams.length === 0}
+                    >
                       Export .ics calendar
                     </Button>
                   </Box>
                 </Box>
                 <Alert severity="info" sx={{ mb: 3 }}>Calendar events use imported or saved end times when available. The selected fallback duration applies to exams without an end time. Events use India Standard Time.</Alert>
-                <Grid container spacing={3}>
-                  {exams.map((exam) => (
-                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={getExamKey(exam, exam.enrollmentNumber)}>
-                      <ExamCard exam={exam} selected onToggle={() => removeExam(exam)} enrollmentNumber={exam.enrollmentNumber} />
-                    </Grid>
-                  ))}
-                </Grid>
+                {visibleExams.length === 0 ? (
+                  <Alert
+                    severity="info"
+                    action={(
+                      <Button color="inherit" size="small" onClick={() => setRegularOnly(false)}>
+                        Show all
+                      </Button>
+                    )}
+                  >
+                    No regular papers are saved in your schedule. Absentee papers are hidden while this filter is on.
+                  </Alert>
+                ) : (
+                  <Grid container spacing={3}>
+                    {visibleExams.map((exam) => (
+                      <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={getExamKey(exam, exam.enrollmentNumber)}>
+                        <ExamCard exam={exam} selected onToggle={() => removeExam(exam)} enrollmentNumber={exam.enrollmentNumber} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
               </>
             )}
           </Container>

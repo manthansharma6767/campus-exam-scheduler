@@ -16,10 +16,12 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -104,6 +106,56 @@ public class TimetableImportService {
                 .message("Imported " + analysis.candidates().size() + " exam(s); skipped "
                         + analysis.skippedDuplicates() + " duplicate(s).")
                 .build();
+    }
+
+    /**
+     * Builds a ready-to-fill Excel template with the headers accepted by the
+     * importer, one example row, and a short instructions sheet.
+     */
+    public byte[] buildImportTemplate() {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Timetable");
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            String[] headers = { "Subject Code", "Date", "Time", "End Time", "Building", "Room" };
+            Row headerRow = sheet.createRow(0);
+            for (int index = 0; index < headers.length; index++) {
+                Cell cell = headerRow.createCell(index);
+                cell.setCellValue(headers[index]);
+                cell.setCellStyle(headerStyle);
+                sheet.setColumnWidth(index, 18 * 256);
+            }
+
+            String[] example = { "24CS01TH0501", "2026-11-30", "11:00 AM", "12:00 PM", "DT-112", "101" };
+            Row exampleRow = sheet.createRow(1);
+            for (int index = 0; index < example.length; index++) {
+                exampleRow.createCell(index).setCellValue(example[index]);
+            }
+            sheet.createFreezePane(0, 1);
+
+            Sheet instructions = workbook.createSheet("Instructions");
+            String[] notes = {
+                    "Required headers: Subject Code, Date, Time.",
+                    "Building and Room are optional and default to \"Not assigned\".",
+                    "Accepted dates include 2026-11-30 and 30-Nov-2026.",
+                    "Accepted times include 11:00, 11:00 AM, and ranges such as 11:00 AM - 12:00 PM.",
+                    "Every Subject Code must already exist under Subjects before importing.",
+                    "Replace the example row with your exam rows; do not rename the Timetable sheet.",
+            };
+            for (int index = 0; index < notes.length; index++) {
+                instructions.createRow(index).createCell(0).setCellValue(notes[index]);
+            }
+            instructions.setColumnWidth(0, 100 * 256);
+
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not build the timetable import template.", exception);
+        }
     }
 
     private TimetableAnalysis analyzeTimetable(MultipartFile file, ExamType examType) {

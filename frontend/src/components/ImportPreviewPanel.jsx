@@ -1,5 +1,6 @@
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -8,6 +9,27 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
+import DownloadIcon from '@mui/icons-material/Download';
+
+function downloadErrorReport(preview) {
+  const rows = [
+    ['Row', 'Category', 'Message'],
+    ...(preview.errors || []).map((error) => [error.rowNumber, 'Row error', error.message]),
+    ...(preview.conflicts || []).map((conflict) => [conflict.rowNumber || '', 'Schedule conflict', conflict.message]),
+  ];
+  const csv = rows
+    .map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\r\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'timetable-import-errors.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 export default function ImportPreviewPanel({ preview, counts }) {
   if (!preview) return null;
@@ -30,6 +52,15 @@ export default function ImportPreviewPanel({ preview, counts }) {
         {summaryCounts.map((count) => (
           <Chip key={count.label} size="small" label={count.label} color={count.color || 'default'} variant="outlined" />
         ))}
+        {!!(preview.errors?.length || preview.conflicts?.length) && (
+          <Button
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={() => downloadErrorReport(preview)}
+          >
+            Download error report (CSV)
+          </Button>
+        )}
       </Box>
 
       {!!preview.errors?.length && (

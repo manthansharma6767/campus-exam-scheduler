@@ -19,6 +19,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Proxy;
 import java.time.LocalDate;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -361,6 +363,30 @@ class TimetableImportServiceTest {
 
         assertTrue(error.getMessage().contains("no selectable text"));
         assertTrue(error.getMessage().contains("OCR"));
+    }
+
+    @Test
+    void buildsAValidTemplateWithAcceptedHeadersAndInstructions() throws Exception {
+        Subject subject = Subject.builder().subjectId(7L).subjectCode("24CS01TH0501").build();
+        TimetableImportService timetableImportService = serviceFor(subject, new ArrayList<>());
+
+        byte[] template = timetableImportService.buildImportTemplate();
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(template))) {
+            var timetable = workbook.getSheet("Timetable");
+            assertNotNull(timetable);
+            assertEquals("Subject Code", timetable.getRow(0).getCell(0).getStringCellValue());
+            assertEquals("End Time", timetable.getRow(0).getCell(3).getStringCellValue());
+            assertEquals("Room", timetable.getRow(0).getCell(5).getStringCellValue());
+            assertEquals("24CS01TH0501", timetable.getRow(1).getCell(0).getStringCellValue());
+            assertNotNull(workbook.getSheet("Instructions"));
+        }
+
+        var preview = timetableImportService.previewTimetable(
+                new MockMultipartFile("file", "exam-import-template.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", template));
+        assertTrue(preview.canImport());
+        assertEquals(1, preview.validRows());
     }
 
     private void writePositionedLine(PDPageContentStream content, float y, String[] values, float[] xPositions) throws Exception {

@@ -69,6 +69,13 @@ export default function Exams() {
   const [importError, setImportError] = useState('');
   const [importAction, setImportAction] = useState('');
   const [importExamType, setImportExamType] = useState('REGULAR');
+  const [filters, setFilters] = useState({
+    query: '',
+    departmentId: '',
+    semester: '',
+    examType: '',
+    sort: 'date-asc',
+  });
 
   const fetchData = async () => {
     setLoading(true);
@@ -87,6 +94,49 @@ export default function Exams() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  const subjectById = new Map(subjects.map((subject) => [subject.subjectId, subject]));
+  const departments = [...new Map(
+    subjects
+      .filter((subject) => subject.departmentId)
+      .map((subject) => [subject.departmentId, subject.departmentName || `Department ${subject.departmentId}`])
+  ).entries()]
+    .map(([id, name]) => ({ id: String(id), name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const semesters = [...new Set(subjects.map((subject) => subject.semester).filter(Boolean))]
+    .sort((a, b) => a - b);
+
+  const normalizedQuery = filters.query.trim().toLowerCase();
+  const filteredExams = exams
+    .filter((exam) => {
+      const subject = subjectById.get(exam.subjectId);
+      if (filters.departmentId && String(subject?.departmentId) !== filters.departmentId) return false;
+      if (filters.semester && String(subject?.semester) !== filters.semester) return false;
+      if (filters.examType && (exam.examType || 'REGULAR') !== filters.examType) return false;
+      if (!normalizedQuery) return true;
+      return [
+        exam.subjectName,
+        exam.subjectCode,
+        exam.building,
+        exam.roomNumber,
+        subject?.departmentName,
+      ].join(' ').toLowerCase().includes(normalizedQuery);
+    })
+    .sort((a, b) => {
+      const first = `${a.examDate}T${a.examTime}`;
+      const second = `${b.examDate}T${b.examTime}`;
+      return filters.sort === 'date-desc'
+        ? second.localeCompare(first)
+        : first.localeCompare(second);
+    });
+
+  const updateFilter = (event) => {
+    setFilters((previous) => ({ ...previous, [event.target.name]: event.target.value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({ query: '', departmentId: '', semester: '', examType: '', sort: 'date-asc' });
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -257,12 +307,59 @@ export default function Exams() {
               Excel headers: Subject Code, Date, Time, Building, Room. PDFs support aligned rows, date-by-course matrices, and scanned pages via OCR; missing venues import as "Not assigned".
             </Typography>
 
+            {!loading && exams.length > 0 && (
+              <Paper elevation={0} sx={{ p: 2, mb: 2.5, backgroundColor: '#242424', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 3 }}>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <TextField
+                    size="small"
+                    label="Search exams"
+                    name="query"
+                    value={filters.query}
+                    onChange={updateFilter}
+                    placeholder="Subject, code, room…"
+                    sx={{ flex: '1 1 240px', minWidth: 220 }}
+                  />
+                  <TextField select size="small" label="Department" name="departmentId" value={filters.departmentId} onChange={updateFilter} sx={{ minWidth: 220 }}>
+                    <MenuItem value="">All departments</MenuItem>
+                    {departments.map((department) => (
+                      <MenuItem key={department.id} value={department.id}>{department.name}</MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField select size="small" label="Semester" name="semester" value={filters.semester} onChange={updateFilter} sx={{ minWidth: 130 }}>
+                    <MenuItem value="">All semesters</MenuItem>
+                    {semesters.map((semester) => (
+                      <MenuItem key={semester} value={String(semester)}>Semester {semester}</MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField select size="small" label="Type" name="examType" value={filters.examType} onChange={updateFilter} sx={{ minWidth: 140 }}>
+                    <MenuItem value="">All types</MenuItem>
+                    <MenuItem value="REGULAR">Regular</MenuItem>
+                    <MenuItem value="ABSENTEE">Absentee</MenuItem>
+                  </TextField>
+                  <TextField select size="small" label="Sort by" name="sort" value={filters.sort} onChange={updateFilter} sx={{ minWidth: 190 }}>
+                    <MenuItem value="date-asc">Date (earliest first)</MenuItem>
+                    <MenuItem value="date-desc">Date (latest first)</MenuItem>
+                  </TextField>
+                  <Button onClick={clearFilters} color="inherit" size="small">Clear filters</Button>
+                </Box>
+                <Typography variant="body2" sx={{ color: '#B0B0B0', mt: 1.5 }}>
+                  Showing {filteredExams.length} of {exams.length} exam{exams.length === 1 ? '' : 's'}
+                </Typography>
+              </Paper>
+            )}
+
             {loading ? (
               <Loading message="Loading exams..." />
             ) : exams.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 8 }}>
                 <QuizIcon sx={{ fontSize: 64, color: '#B0B0B0', opacity: 0.2, mb: 2 }} />
                 <Typography variant="h6" sx={{ color: '#B0B0B0' }}>No exams found</Typography>
+              </Box>
+            ) : filteredExams.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <QuizIcon sx={{ fontSize: 56, color: '#B0B0B0', opacity: 0.2, mb: 2 }} />
+                <Typography variant="h6" sx={{ color: '#B0B0B0', mb: 2 }}>No exams match these filters</Typography>
+                <Button onClick={clearFilters} color="inherit" variant="outlined">Clear filters</Button>
               </Box>
             ) : (
               <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3, overflowX: 'auto', backgroundColor: '#242424' }}>
@@ -279,7 +376,7 @@ export default function Exams() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {exams.map((exam) => (
+                    {filteredExams.map((exam) => (
                       <TableRow key={exam.examId}>
                         <TableCell>
                           <Box>

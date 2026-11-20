@@ -16,10 +16,29 @@ import PlaceIcon from '@mui/icons-material/Place';
 import SchoolIcon from '@mui/icons-material/School';
 import api from '../services/api';
 
+const PLAN_STORAGE_KEY = 'seating_lookup_plan';
+const ROLL_STORAGE_KEY = 'seating_lookup_roll';
+
+function readStoredValue(key) {
+  try {
+    return localStorage.getItem(key) || '';
+  } catch {
+    return '';
+  }
+}
+
+function storeValue(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Remembering the last lookup is a convenience, not a requirement.
+  }
+}
+
 export default function SeatingLookup() {
   const [plans, setPlans] = useState([]);
   const [planId, setPlanId] = useState('');
-  const [rollNumber, setRollNumber] = useState('');
+  const [rollNumber, setRollNumber] = useState(() => readStoredValue(ROLL_STORAGE_KEY));
   const [seat, setSeat] = useState(null);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -29,7 +48,14 @@ export default function SeatingLookup() {
     api.get('/api/seating/plans')
       .then(({ data }) => {
         setPlans(data);
-        if (data.length) setPlanId(String(data[0].seatingPlanId));
+        if (data.length) {
+          const preferred = data.find(
+            (plan) => String(plan.seatingPlanId) === readStoredValue(PLAN_STORAGE_KEY)
+          ) || data[0];
+          const preferredId = String(preferred.seatingPlanId);
+          setPlanId(preferredId);
+          storeValue(PLAN_STORAGE_KEY, preferredId);
+        }
       })
       .catch(() => setError('Could not load seating plans. Please try again later.'))
       .finally(() => setLoadingPlans(false));
@@ -53,7 +79,11 @@ export default function SeatingLookup() {
     setSeat(null);
     try {
       const { data } = await api.get(`/api/seating/plans/${planId}/roll/${encodeURIComponent(roll)}`);
+      const canonicalRoll = data.rollNumber || roll.toUpperCase();
       setSeat(data);
+      setRollNumber(canonicalRoll);
+      storeValue(ROLL_STORAGE_KEY, canonicalRoll);
+      storeValue(PLAN_STORAGE_KEY, planId);
     } catch (requestError) {
       const status = requestError.response?.status;
       setError(status === 404
@@ -112,7 +142,12 @@ export default function SeatingLookup() {
                         fullWidth
                         label="Seating plan"
                         value={planId}
-                        onChange={(event) => { setPlanId(event.target.value); setSeat(null); setError(''); }}
+                        onChange={(event) => {
+                          setPlanId(event.target.value);
+                          storeValue(PLAN_STORAGE_KEY, event.target.value);
+                          setSeat(null);
+                          setError('');
+                        }}
                         sx={{ mb: 2.5 }}
                         slotProps={{ select: { inputProps: { 'aria-label': 'Choose a seating plan' } } }}
                       >

@@ -25,6 +25,7 @@ import Chip from '@mui/material/Chip';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import QuizIcon from '@mui/icons-material/Quiz';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -69,6 +70,7 @@ export default function Exams() {
   const [importError, setImportError] = useState('');
   const [importAction, setImportAction] = useState('');
   const [importExamType, setImportExamType] = useState('REGULAR');
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [filters, setFilters] = useState({
     query: '',
     departmentId: 'all',
@@ -272,6 +274,26 @@ export default function Exams() {
     setImportExamType('REGULAR');
   };
 
+  const handleTemplateDownload = async () => {
+    setDownloadingTemplate(true);
+    setImportError('');
+    try {
+      const response = await api.get('/api/exams/import/template', { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'exam-import-template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setImportError('Could not download the import template. Please try again.');
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  };
+
   return (
     <Fade in timeout={600}>
       <Box>
@@ -455,6 +477,14 @@ export default function Exams() {
             <Typography component="span" sx={{ ml: 1.5, color: 'text.secondary', overflowWrap: 'anywhere' }}>
               {importFile?.name || 'No file selected'}
             </Typography>
+            <Box sx={{ mt: 1.5 }}>
+              <Button variant="text" size="small" startIcon={<DownloadIcon />} onClick={handleTemplateDownload} disabled={importing || downloadingTemplate}>
+                {downloadingTemplate ? 'Downloading…' : 'Download Excel template'}
+              </Button>
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                The template includes the accepted headers, an example row, and an Instructions sheet.
+              </Typography>
+            </Box>
             <ImportPreviewPanel preview={importPreview} />
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>

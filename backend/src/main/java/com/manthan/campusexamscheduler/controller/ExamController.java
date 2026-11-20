@@ -4,9 +4,12 @@ import com.manthan.campusexamscheduler.dto.ExamRequest;
 import com.manthan.campusexamscheduler.dto.ExamResponse;
 import com.manthan.campusexamscheduler.entity.ExamType;
 import com.manthan.campusexamscheduler.service.ExamService;
+import com.manthan.campusexamscheduler.service.TimetableImportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +22,16 @@ import java.time.LocalDate;
 public class ExamController {
 
     private final ExamService examService;
+    private final TimetableImportService timetableImportService;
+
+    @GetMapping("/import/template")
+    public ResponseEntity<byte[]> downloadTimetableTemplate() {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"exam-import-template.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(timetableImportService.buildImportTemplate());
+    }
 
     @GetMapping("/search")
     public ResponseEntity<List<ExamResponse>> searchPublicExams(

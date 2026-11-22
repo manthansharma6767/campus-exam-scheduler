@@ -32,7 +32,7 @@ function formatTime(timeStr) {
   return `${h12}:${minutes} ${ampm}`;
 }
 
-export default function ExamCard({ exam, selected = false, onToggle, enrollmentNumber }) {
+export default function ExamCard({ exam, selected = false, onToggle, enrollmentNumber, clash = false }) {
   return (
     <Card
       sx={{
@@ -42,10 +42,13 @@ export default function ExamCard({ exam, selected = false, onToggle, enrollmentN
         position: 'relative',
         overflow: 'visible',
         backgroundColor: '#2A2A2A',
-        border: '1px solid rgba(255,255,255,0.06)',
+        border: clash ? '1px solid #FF5252' : '1px solid rgba(255,255,255,0.06)',
+        boxShadow: clash ? '0 0 0 1px rgba(255, 82, 82, 0.2)' : undefined,
         '&:hover': {
-          borderColor: 'rgba(230, 81, 0, 0.3)',
-          boxShadow: '0 8px 30px rgba(230, 81, 0, 0.12)',
+          borderColor: clash ? '#FF5252' : 'rgba(230, 81, 0, 0.3)',
+          boxShadow: clash
+            ? '0 8px 30px rgba(255, 82, 82, 0.18)'
+            : '0 8px 30px rgba(230, 81, 0, 0.12)',
         },
       }}
     >
@@ -87,6 +90,19 @@ export default function ExamCard({ exam, selected = false, onToggle, enrollmentN
                   border: exam.examType === 'ABSENTEE' ? '1px solid #FF8F00' : '1px solid rgba(255,255,255,0.12)',
                 }}
               />
+              {clash && (
+                <Chip
+                  label="TIME CLASH"
+                  size="small"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '0.68rem',
+                    backgroundColor: 'rgba(255, 82, 82, 0.18)',
+                    color: '#FF8A80',
+                    border: '1px solid #FF5252',
+                  }}
+                />
+              )}
             </Box>
           </Box>
         </Box>

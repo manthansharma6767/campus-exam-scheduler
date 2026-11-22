@@ -163,7 +163,7 @@ export default function BrowseExams() {
             ) : (
               <>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' } }}>
-                  <Typography variant="h5" sx={{ fontWeight: 600, color: '#FFB300' }}>
+                  <Typography variant="h5" aria-live="polite" sx={{ fontWeight: 600, color: '#FFB300' }}>
                     {exams.length} exam{exams.length === 1 ? '' : 's'} found · {selectedKeys.size} saved from browse
                   </Typography>
                   <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>

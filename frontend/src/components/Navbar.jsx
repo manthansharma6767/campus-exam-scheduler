@@ -461,7 +461,7 @@ export default function Navbar() {
             Recent Searches
           </Typography>
           {recentSearches.length > 0 && (
-            <IconButton size="small" onClick={handleClearHistory} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#EF5350' } }}>
+            <IconButton size="small" onClick={handleClearHistory} aria-label="Clear recent searches" sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#EF5350' } }}>
               <DeleteIcon fontSize="small" />
             </IconButton>
           )}

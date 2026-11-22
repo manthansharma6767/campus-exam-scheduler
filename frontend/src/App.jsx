@@ -36,9 +36,37 @@ export default function App() {
             minHeight: '100vh',
           }}
         >
+          <Box
+            component="a"
+            href="#main-content"
+            sx={{
+              position: 'fixed',
+              top: 8,
+              left: 8,
+              zIndex: (appTheme) => appTheme.zIndex.tooltip + 1,
+              px: 2,
+              py: 1,
+              borderRadius: 1,
+              backgroundColor: '#FFB300',
+              color: '#1A1A1A',
+              fontWeight: 700,
+              textDecoration: 'none',
+              transform: 'translateY(-200%)',
+              transition: 'transform 0.15s ease',
+              '&:focus': { transform: 'translateY(0)' },
+            }}
+          >
+            Skip to main content
+          </Box>
+
           <Navbar />
 
-          <Box component="main" sx={{ flexGrow: 1 }}>
+          <Box
+            component="main"
+            id="main-content"
+            tabIndex={-1}
+            sx={{ flexGrow: 1, '&:focus': { outline: 'none' } }}
+          >
             <Suspense fallback={<Loading message="Loading page..." />}>
               <Routes>
                 {/* Public Routes */}

@@ -74,6 +74,18 @@ const theme = createTheme({
           backgroundColor: '#1A1A1A',
           color: '#FFFFFF',
         },
+        'a:focus-visible, button:focus-visible, [role="button"]:focus-visible': {
+          outline: '2px solid #FFB300',
+          outlineOffset: 2,
+        },
+        '@media (prefers-reduced-motion: reduce)': {
+          '*, *::before, *::after': {
+            animationDuration: '0.01ms !important',
+            animationIterationCount: '1 !important',
+            transitionDuration: '0.01ms !important',
+            scrollBehavior: 'auto !important',
+          },
+        },
       },
     },
     MuiCard: {

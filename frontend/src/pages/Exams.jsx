@@ -364,7 +364,7 @@ export default function Exams() {
                   </TextField>
                   <Button onClick={clearFilters} color="inherit" size="small">Clear filters</Button>
                 </Box>
-                <Typography variant="body2" sx={{ color: '#B0B0B0', mt: 1.5 }}>
+                <Typography variant="body2" aria-live="polite" sx={{ color: '#B0B0B0', mt: 1.5 }}>
                   Showing {filteredExams.length} of {exams.length} exam{exams.length === 1 ? '' : 's'}
                 </Typography>
               </Paper>

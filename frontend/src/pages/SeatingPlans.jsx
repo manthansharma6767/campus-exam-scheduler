@@ -20,9 +20,11 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ChairIcon from '@mui/icons-material/Chair';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import Loading from '../components/Loading';
 import ConfirmDialog from '../components/ConfirmDialog';
 import api from '../services/api';
+import { slugifyFilename } from '../utils/csv';
 
 function formatImportedAt(value) {
   if (!value) return '—';
@@ -40,6 +42,7 @@ export default function SeatingPlans() {
   const [notice, setNotice] = useState({ open: false, message: '' });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [exportingPlanId, setExportingPlanId] = useState(null);
 
   const fetchPlans = async () => {
     try {
@@ -93,6 +96,27 @@ export default function SeatingPlans() {
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleExport = async (plan) => {
+    setExportingPlanId(plan.seatingPlanId);
+    setError('');
+    try {
+      const { data } = await api.get(`/api/seating/plans/${plan.seatingPlanId}/export`, { responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${slugifyFilename(plan.title, `seating-plan-${plan.seatingPlanId}`)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setNotice({ open: true, message: `Exported ${plan.seatCount} seat assignment(s).` });
+    } catch {
+      setError('Could not export this seating plan. Please try again.');
+    } finally {
+      setExportingPlanId(null);
     }
   };
 
@@ -181,6 +205,15 @@ export default function SeatingPlans() {
                         <TableCell align="right">{plan.roomCount}</TableCell>
                         <TableCell>{formatImportedAt(plan.importedAt)}</TableCell>
                         <TableCell align="right">
+                          <IconButton
+                            aria-label={`Export ${plan.title} as CSV`}
+                            title="Export CSV"
+                            color="primary"
+                            disabled={exportingPlanId === plan.seatingPlanId}
+                            onClick={() => handleExport(plan)}
+                          >
+                            <DownloadIcon />
+                          </IconButton>
                           <IconButton aria-label={`Delete ${plan.title}`} color="error" onClick={() => setDeleteTarget(plan)}>
                             <DeleteIcon />
                           </IconButton>

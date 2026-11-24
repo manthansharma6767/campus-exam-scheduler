@@ -1,6 +1,7 @@
 package com.manthan.campusexamscheduler.service;
 
 import com.manthan.campusexamscheduler.dto.SeatLookupResponse;
+import com.manthan.campusexamscheduler.dto.SeatingPlanCsvExport;
 import com.manthan.campusexamscheduler.dto.SeatingPlanImportResponse;
 import com.manthan.campusexamscheduler.dto.SeatingPlanResponse;
 import com.manthan.campusexamscheduler.entity.SeatAssignment;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -128,12 +130,51 @@ public class SeatingPlanService {
         return toSeatResponse(plan, assignment);
     }
 
+    @Transactional(readOnly = true)
+    public SeatingPlanCsvExport exportPlanCsv(Long planId) {
+        SeatingPlan plan = seatingPlanRepository.findById(planId)
+                .orElseThrow(() -> new ResourceNotFoundException("Seating plan not found."));
+        List<SeatAssignment> assignments = seatAssignmentRepository
+                .findAllBySeatingPlan_SeatingPlanIdOrderByRoomNumberAscRowNumberAscColumnNumberAsc(planId);
+
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        appendCsvRow(csv, "Plan", "Department", "Semester", "Roll Number", "Section", "Room", "Row", "Column");
+        for (SeatAssignment assignment : assignments) {
+            appendCsvRow(csv,
+                    plan.getTitle(),
+                    plan.getDepartmentName(),
+                    plan.getSemester() == null || plan.getSemester() == 0 ? "" : plan.getSemester(),
+                    assignment.getRollNumber(),
+                    assignment.getSection(),
+                    assignment.getRoomNumber(),
+                    assignment.getRowNumber(),
+                    assignment.getColumnNumber());
+        }
+        return new SeatingPlanCsvExport(csvFilename(plan), csv.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
     @Transactional
     public void deletePlan(Long planId) {
         SeatingPlan plan = seatingPlanRepository.findById(planId)
                 .orElseThrow(() -> new ResourceNotFoundException("Seating plan not found."));
         seatAssignmentRepository.deleteAllBySeatingPlan_SeatingPlanId(planId);
         seatingPlanRepository.delete(plan);
+    }
+
+    private void appendCsvRow(StringBuilder csv, Object... values) {
+        for (int index = 0; index < values.length; index++) {
+            if (index > 0) csv.append(',');
+            String value = values[index] == null ? "" : values[index].toString();
+            csv.append('"').append(value.replace("\"", "\"\"")).append('"');
+        }
+        csv.append("\r\n");
+    }
+
+    private String csvFilename(SeatingPlan plan) {
+        String slug = plan.getTitle().toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("^-+|-+$", "");
+        return (slug.isBlank() ? "seating-plan-" + plan.getSeatingPlanId() : slug) + ".csv";
     }
 
     private SeatingPlanResponse toPlanResponse(SeatingPlan plan) {

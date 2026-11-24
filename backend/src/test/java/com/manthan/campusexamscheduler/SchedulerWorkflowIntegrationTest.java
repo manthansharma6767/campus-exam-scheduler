@@ -40,6 +40,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -67,6 +68,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -191,6 +194,14 @@ class SchedulerWorkflowIntegrationTest {
     @Test
     void adminEndpointsReturnUnauthorizedWhenNoTokenIsProvided() throws Exception {
         mockMvc.perform(get("/api/departments"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void seatingPlanListRemainsPublicButRosterExportRequiresLogin() throws Exception {
+        mockMvc.perform(get("/api/seating/plans"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/seating/plans/1/export"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -500,6 +511,23 @@ class SchedulerWorkflowIntegrationTest {
         assertTrue(replaced.isReplacedExistingPlan());
         assertEquals(imported.getPlan().getSeatingPlanId(), replaced.getPlan().getSeatingPlanId());
         assertEquals(4, replaced.getPlan().getSeatCount());
+    }
+
+    @Test
+    void exportsSeatingPlanRosterAsCsv() throws Exception {
+        MockMultipartFile seatingPdf = new MockMultipartFile(
+                "file", "5th-sem-seating.pdf", MediaType.APPLICATION_PDF_VALUE, seatingPdfBytes());
+        var imported = seatingPlanService.importPdf(seatingPdf, null);
+
+        mockMvc.perform(get("/api/seating/plans/{planId}/export", imported.getPlan().getSeatingPlanId())
+                        .with(user("test-admin")))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("attachment")))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        containsString("sessional-test-1-" + RUN_SUFFIX + ".csv")))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("text/csv")))
+                .andExpect(content().string(containsString("Roll Number")))
+                .andExpect(content().string(containsString("\"A1-4\",\"A1\",\"DT-101\",\"1\",\"2\"")));
     }
 
     @Test

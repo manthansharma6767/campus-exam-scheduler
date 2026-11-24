@@ -33,6 +33,7 @@ import Loading from '../components/Loading';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ImportPreviewPanel from '../components/ImportPreviewPanel';
 import api from '../services/api';
+import { downloadCsv } from '../utils/csv';
 
 const emptyForm = { examDate: '', examTime: '', examEndTime: '', roomNumber: '', subjectId: '', building: '', examType: 'REGULAR' };
 
@@ -138,6 +139,29 @@ export default function Exams() {
 
   const clearFilters = () => {
     setFilters({ query: '', departmentId: 'all', semester: 'all', examType: 'all', sort: 'date-asc' });
+  };
+
+  const handleExportCsv = () => {
+    const rows = filteredExams.map((exam) => {
+      const subject = subjectById.get(exam.subjectId);
+      return [
+        exam.examDate,
+        exam.examTime ? exam.examTime.substring(0, 5) : '',
+        exam.examEndTime ? exam.examEndTime.substring(0, 5) : '',
+        exam.subjectCode,
+        exam.subjectName,
+        exam.examType === 'ABSENTEE' ? 'Absentee' : 'Regular',
+        subject?.departmentName || '',
+        subject?.semester ?? '',
+        exam.building,
+        exam.roomNumber,
+      ];
+    });
+    downloadCsv(
+      `exam-timetable-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Start Time', 'End Time', 'Subject Code', 'Subject Name', 'Type', 'Department', 'Semester', 'Building', 'Room'],
+      rows
+    );
   };
 
   const handleChange = (e) => {
@@ -315,6 +339,11 @@ export default function Exams() {
         <Box sx={{ background: '#1A1A1A', minHeight: '60vh' }}>
           <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
+              <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCsv}
+                disabled={loading || filteredExams.length === 0}
+                sx={{ borderColor: '#FF8F00', color: '#FFB300', '&:hover': { borderColor: '#FFB300' } }}>
+                Export CSV
+              </Button>
               <Button variant="outlined" startIcon={<UploadFileIcon />} disabled={importing} onClick={() => setImportDialogOpen(true)}
                 sx={{ borderColor: '#FF8F00', color: '#FFB300', '&:hover': { borderColor: '#FFB300' } }}>
                 {importing ? 'Importing...' : 'Import timetable'}

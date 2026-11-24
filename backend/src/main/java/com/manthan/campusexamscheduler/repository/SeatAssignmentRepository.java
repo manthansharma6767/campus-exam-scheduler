@@ -5,11 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface SeatAssignmentRepository extends JpaRepository<SeatAssignment, Long> {
 
     Optional<SeatAssignment> findBySeatingPlan_SeatingPlanIdAndRollNumberIgnoreCase(Long seatingPlanId, String rollNumber);
+
+    List<SeatAssignment> findAllBySeatingPlan_SeatingPlanIdOrderByRoomNumberAscRowNumberAscColumnNumberAsc(Long seatingPlanId);
 
     long countBySeatingPlan_SeatingPlanId(Long seatingPlanId);
 

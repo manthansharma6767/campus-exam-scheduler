@@ -18,6 +18,7 @@ Campus Exam Scheduler is a full-stack application for publishing university exam
 - Separate `REGULAR` and `ABSENTEE` exam types
 - Per-student absentee-paper assignments with administrator-controlled locks
 - Seating-plan PDF import and public roll-number seat lookup
+- CSV exports for the filtered exam timetable and complete seating-plan rosters
 - Administrator password change from the dashboard
 
 ### Student experience
@@ -270,6 +271,8 @@ The preview reports invalid rows, uncertain OCR fields, duplicate rows, and conf
 
 Conflict checks cover room double-booking and same-department/semester cohort clashes. Parallel section variants of the same paper family are allowed to share a slot. Absentee papers are compared separately from regular papers for student clashes.
 
+The **Exam Management** toolbar can export the currently filtered timetable as CSV. The export follows the search, department, semester, type, and sort controls, so it can be used for a specific cohort instead of the entire list.
+
 ### Absentee papers
 
 Create or import exams with the `ABSENTEE` type, then open **Student Management -> Manage absentee papers** for a student. The administrator can assign absentee papers that belong to the student's department and semester, and can lock individual assignments so the student cannot remove them.
@@ -283,6 +286,8 @@ After a student verifies their enrollment number and date of birth, the student 
 Administrators can upload a text-based seating-plan PDF from **Seating Plans**. The parser recognizes room headings and roll numbers in formats such as `A1-16`, and records room, row, column, and section where available. Reimporting a plan with the same title, department, and semester replaces its seat assignments.
 
 Students can open **Seating Lookup**, choose a published plan, and enter a roll number in the same format. Scanned or image-only seating-plan PDFs are not supported.
+
+Each imported plan has an **Export CSV** action that downloads the complete roster: plan, department, semester, roll number, section, room, row, and column. The roster export requires an administrator JWT; the plan list and individual seat lookup remain public.
 
 ## Student schedules and calendar export
 
@@ -314,6 +319,7 @@ All endpoints return JSON unless noted. Multipart endpoints accept a `file` part
 | DOB backfill | `POST /api/students/dob-backfill/preview?overwriteExisting=false`, `POST /api/students/dob-backfill?overwriteExisting=false&confirm=true` | Administrator JWT; multipart CSV/XLS/XLSX; unmatched rows block apply; `confirm=true` is required |
 | Timetable import | `POST /api/exams/import/preview`, `POST /api/exams/import` | Administrator JWT; multipart XLS/XLSX/PDF; optional `examType` of `REGULAR` or `ABSENTEE` |
 | Seating import | `POST /api/seating/plans/import` | Administrator JWT; multipart PDF; optional `title` |
+| Seating export | `GET /api/seating/plans/{planId}/export` | Administrator JWT; CSV attachment |
 | Public seating | `GET /api/seating/plans`, `GET /api/seating/plans/{planId}/roll/{rollNumber}` | Public |
 | API documentation | `/swagger-ui/index.html`, `/v3/api-docs` | Public by default |
 

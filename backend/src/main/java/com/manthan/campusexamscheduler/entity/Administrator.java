@@ -39,4 +39,9 @@ public class Administrator {
     @Column(nullable = false, length = 255)
     private String password;
 
+    // Incremented on credential changes. JWTs carry this value and are rejected
+    // as soon as it no longer matches the administrator record.
+    @Column(nullable = false)
+    private long tokenVersion;
+
 }

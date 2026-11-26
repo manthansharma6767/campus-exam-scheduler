@@ -19,7 +19,7 @@ Campus Exam Scheduler is a full-stack application for publishing university exam
 - Per-student absentee-paper assignments with administrator-controlled locks
 - Seating-plan PDF import and public roll-number seat lookup
 - CSV exports for the filtered exam timetable and complete seating-plan rosters
-- Administrator password change from the dashboard
+- Administrator password change from the dashboard, with other sessions revoked immediately
 
 ### Student experience
 
@@ -59,7 +59,7 @@ Campus Exam Scheduler is a full-stack application for publishing university exam
 |   |   |-- service/         # business logic, imports, verification
 |   |   |-- repository/      # Spring Data repositories
 |   |   `-- entity/          # JPA entities
-|   |-- src/main/resources/db/migration/   # Flyway V1 through V3
+|   |-- src/main/resources/db/migration/   # Flyway V1 through V4
 |   |-- src/test/java/...                   # integration and import tests
 |   |-- Dockerfile
 |   `-- mvnw, mvnw.cmd
@@ -185,6 +185,7 @@ Flyway is the source of truth for schema changes:
 - `V1__baseline_schema.sql` creates the baseline tables for a fresh installation.
 - `V2__student_dob_and_absentee_audit.sql` adds `students.date_of_birth` and the `source`, `locked`, `updated_at`, and `updated_by` audit fields on absentee assignments.
 - `V3__student_dob_audit.sql` adds `students.dob_updated_at` and `students.dob_updated_by` so DOB backfill changes are attributable.
+- `V4__auth_token_revocation_and_rate_limits.sql` adds `administrators.token_version` for immediate JWT revocation and the shared `auth_rate_limits` table used by login and student-verification throttling.
 
 The application uses `spring.jpa.hibernate.ddl-auto=validate`. Do not change it to `update` or `create`; Hibernate should validate Flyway's schema, not modify it.
 
@@ -194,11 +195,11 @@ For an existing database:
 
 1. Take a verified backup before starting the application.
 2. Confirm the current `flyway_schema_history` state if the database has been migrated before.
-3. Start the backend and review the Flyway log. An existing schema without Flyway history is baselined at V1 and then receives V2 and V3.
+3. Start the backend and review the Flyway log. An existing schema without Flyway history is baselined at V1 and then receives V2 through V4.
 
-If a legacy schema already contains the V2 or V3 columns but has no Flyway history, the corresponding migration will fail. Restore the backup and reconcile the baseline and migration history with a database administrator rather than deleting data or editing an applied migration.
+If a legacy schema already contains the V2 through V4 schema objects but has no Flyway history, the corresponding migration will fail. Restore the backup and reconcile the baseline and migration history with a database administrator rather than deleting data or editing an applied migration.
 
-Do not edit a migration that has already been applied. Flyway validates checksums. Add a new `V4__...sql` migration instead. The files in `database/migrations/` are legacy manual snippets retained for reference; the authoritative migration path is `backend/src/main/resources/db/migration/`.
+Do not edit a migration that has already been applied. Flyway validates checksums. Add a new migration file instead. The files in `database/migrations/` are legacy manual snippets retained for reference; the authoritative migration path is `backend/src/main/resources/db/migration/`.
 
 `database/demo-data.sql` is optional, inserts synthetic records only, and is not executed automatically. Do not run it against production data.
 
@@ -211,7 +212,7 @@ Do not edit a migration that has already been applied. Flyway validates checksum
 
 The bootstrap endpoint is rejected once any administrator exists. After setup, unset `ADMIN_SETUP_TOKEN` and restart the backend as defense in depth. Additional administrators can be created through the authenticated `/api/admins` endpoints; the current frontend does not include a dedicated administrator-management screen.
 
-The signed-in administrator can change their own password from the dashboard. The change requires the current password and a new password of at least 8 characters.
+The signed-in administrator can change their own password from the dashboard. The change requires the current password and a new password of at least 8 characters. Changing the password revokes every older JWT for that administrator immediately; the current browser receives a replacement token so it stays signed in, while other sessions are signed out.
 
 ## Import workflows
 
@@ -308,7 +309,7 @@ All endpoints return JSON unless noted. Multipart endpoints accept a `file` part
 
 | Area | Endpoints | Access |
 | --- | --- | --- |
-| Authentication | `POST /api/auth/login`, `POST /api/auth/register`, `PUT /api/auth/password` | Login and bootstrap are public; bootstrap also requires `X-Admin-Setup-Token`; password change requires an administrator JWT |
+| Authentication | `POST /api/auth/login`, `POST /api/auth/register`, `PUT /api/auth/password` | Login and bootstrap are public; bootstrap also requires `X-Admin-Setup-Token`; password change requires an administrator JWT and returns a replacement JWT |
 | Administrator CRUD | `/api/admins`, `/api/departments`, `/api/subjects`, `/api/students`, `/api/exams` | Administrator JWT |
 | Public exam search | `GET /api/exams/search?query=&semester=&date=&examType=` | Public |
 | Public schedule | `GET /api/students/{enrollmentNumber}/schedule` | Public |
@@ -331,7 +332,7 @@ Swagger UI is available while the backend is running at `http://localhost:8080/s
 
 | Control | Current behavior |
 | --- | --- |
-| Administrator authentication | Stateless JWT access token, valid for 24 hours |
+| Administrator authentication | Stateless JWT access token, valid for 24 hours; checked against the administrator's current token version |
 | Password storage | BCrypt; new passwords are 8 to 72 characters |
 | Student verification | Enrollment number plus date of birth; scoped verification token valid for 10 minutes |
 | Login and verification throttling | 5 failures per 15-minute window per email or enrollment number; returns `429` with `Retry-After` |
@@ -353,8 +354,8 @@ Operational expectations:
 ### Known limitations
 
 - **Date-of-birth backfill:** Self-service absentee management only works for students with a stored `date_of_birth`. Use **Student Management -> Backfill DOB** to fill missing dates. Unmatched enrollment numbers block the file, and overwriting an existing date requires the explicit overwrite mode and final confirmation. Backfill writes record the administrator and timestamp.
-- **No immediate JWT revocation:** Changing an administrator password does not invalidate JWTs already issued to that account; they remain valid until their 24-hour expiry. Rotating `JWT_SECRET` invalidates all tokens and signs every administrator out.
-- **Process-local rate limiting:** The failure limiter is held in memory. A multi-instance deployment needs a shared store such as Redis or rate limiting at the API gateway.
+- **Shared rate-limit table:** Login and student-verification failures are stored in `auth_rate_limits` for 15 minutes, and expired rows are removed hourly. The database user needs write access to this table.
+- **Rate-limit granularity:** Limits are keyed by normalized email for login and enrollment number for student verification. They are not currently keyed by client IP, so add gateway or edge limits if you need network-level throttling.
 - **Replace-all administrator saves:** Administrator absentee saves replace the complete assignment set. Concurrent edits can overwrite each other, so refresh before saving when multiple administrators may be working on the same student.
 - **Tests use the application schema:** The backend test guard requires the `campus_exam_scheduler` schema and disables Flyway. Tests are transactional and roll back their own records, but they are not isolated from existing data. Run them only against a local or disposable database.
 - **Docker image does not include OCR:** The checked-in backend image does not install Tesseract. Text-based PDFs work, but scanned timetable PDF import requires a custom image with Tesseract and language data, or running the backend on a host where Tesseract is installed.
@@ -396,7 +397,7 @@ Every pull request to `main` must pass two required checks:
 
 | Check | What it runs |
 | --- | --- |
-| `backend` | MySQL 8.0 service, Flyway migrations V1–V3, `./mvnw test` |
+| `backend` | MySQL 8.0 service, Flyway migrations V1–V4, `./mvnw test` |
 | `frontend` | `npm ci`, `npm run lint`, `npm run build` |
 
 The workflow is defined in `.github/workflows/ci.yml`. Branch protection on `main` requires a pull request and both checks, so direct pushes, force pushes, and branch deletion are blocked. New pull requests start from `.github/pull_request_template.md`.

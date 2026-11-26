@@ -16,6 +16,7 @@ import java.util.function.Function;
 public class JwtService {
 
     private static final String TOKEN_TYPE_CLAIM = "token_type";
+    private static final String TOKEN_VERSION_CLAIM = "token_version";
     private static final String ACCESS_TOKEN_TYPE = "access";
     private static final String STUDENT_VERIFICATION_TOKEN_TYPE = "student-verification";
 
@@ -35,10 +36,11 @@ public class JwtService {
     }
 
     // Generate admin access JWT
-    public String generateToken(String email) {
+    public String generateToken(String email, long tokenVersion) {
         return Jwts.builder()
                 .subject(email)
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
+                .claim(TOKEN_VERSION_CLAIM, tokenVersion)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + EXPIRY_MS))
                 .signWith(getSigningKey())
@@ -89,12 +91,19 @@ public class JwtService {
         return extractExpiration(token).before(new Date());
     }
 
-    // Validate admin access token. Tokens issued before token types were added
-    // are still treated as access tokens so existing sessions keep working.
-    public boolean isTokenValid(String token, String email) {
+    // Validate admin access token and ensure it belongs to the administrator's
+    // current credential version. Tokens issued before token versions were
+    // added have no claim and are treated as version 0.
+    public boolean isTokenValid(String token, String email, long tokenVersion) {
         return extractUsername(token).equals(email)
                 && !isTokenExpired(token)
-                && isAccessToken(token);
+                && isAccessToken(token)
+                && extractTokenVersion(token) == tokenVersion;
+    }
+
+    public long extractTokenVersion(String token) {
+        Object value = extractClaim(token, claims -> claims.get(TOKEN_VERSION_CLAIM));
+        return value instanceof Number number ? number.longValue() : 0L;
     }
 
     private boolean isAccessToken(String token) {

@@ -1,64 +1,73 @@
 package com.manthan.campusexamscheduler.service;
 
+import com.manthan.campusexamscheduler.entity.AuthRateLimit;
 import com.manthan.campusexamscheduler.exception.RateLimitExceededException;
+import com.manthan.campusexamscheduler.repository.AuthRateLimitRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 /**
- * Small in-memory failure limiter for public authentication flows. It is
- * intentionally process-local; a multi-instance deployment should move this
- * state to a shared store.
+ * Failure limiter for public authentication flows. State lives in MySQL so
+ * every application instance enforces the same limits.
  */
 @Service
+@RequiredArgsConstructor
 public class RateLimitService {
 
     static final int MAX_FAILURES = 5;
     static final Duration WINDOW = Duration.ofMinutes(15);
 
-    private final ConcurrentMap<String, AttemptWindow> attempts = new ConcurrentHashMap<>();
+    private final AuthRateLimitRepository rateLimitRepository;
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void check(String key) {
         Instant now = Instant.now();
-        AttemptWindow window = attempts.get(key);
-        if (window == null) {
+        AuthRateLimit entry = rateLimitRepository.findById(key).orElse(null);
+        if (entry == null) {
             return;
         }
-        if (window.isExpired(now)) {
-            attempts.remove(key, window);
+        if (isExpired(entry, now)) {
+            rateLimitRepository.deleteByRateKey(key);
             return;
         }
-        if (window.failures() >= MAX_FAILURES) {
-            throw new RateLimitExceededException(window.retryAfterSeconds(now));
+        if (entry.getFailureCount() >= MAX_FAILURES) {
+            throw new RateLimitExceededException(retryAfterSeconds(entry, now));
         }
     }
 
+    /**
+     * Runs in its own transaction because callers often throw immediately after
+     * recording a failure; the counter must survive that rollback.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailure(String key) {
         Instant now = Instant.now();
-        attempts.compute(key, (ignored, existing) -> {
-            if (existing == null || existing.isExpired(now)) {
-                return new AttemptWindow(1, now);
-            }
-            return new AttemptWindow(existing.failures() + 1, existing.windowStart());
-        });
+        rateLimitRepository.recordFailure(key, now, now.minus(WINDOW));
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void clear(String key) {
-        attempts.remove(key);
+        rateLimitRepository.deleteByRateKey(key);
     }
 
-    private record AttemptWindow(int failures, Instant windowStart) {
+    @Scheduled(fixedDelay = 3_600_000)
+    @Transactional
+    public void deleteExpiredAttempts() {
+        rateLimitRepository.deleteExpired(Instant.now().minus(WINDOW));
+    }
 
-        boolean isExpired(Instant now) {
-            return !now.isBefore(windowStart.plus(WINDOW));
-        }
+    private boolean isExpired(AuthRateLimit entry, Instant now) {
+        return !now.isBefore(entry.getWindowStartedAt().plus(WINDOW));
+    }
 
-        long retryAfterSeconds(Instant now) {
-            Duration remaining = Duration.between(now, windowStart.plus(WINDOW));
-            return Math.max(1, (remaining.toMillis() + 999) / 1000);
-        }
+    private long retryAfterSeconds(AuthRateLimit entry, Instant now) {
+        Duration remaining = Duration.between(now, entry.getWindowStartedAt().plus(WINDOW));
+        return Math.max(1, (remaining.toMillis() + 999) / 1000);
     }
 }

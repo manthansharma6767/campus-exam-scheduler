@@ -40,7 +40,12 @@ public class AuthenticationService {
                 )
         );
 
-        String jwtToken = jwtService.generateToken(request.getEmail());
+        Administrator administrator = administratorRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Authenticated administrator no longer exists."));
+        String jwtToken = jwtService.generateToken(
+                administrator.getEmail(),
+                administrator.getTokenVersion());
 
         return AuthenticationResponse.builder()
                 .token(jwtToken)

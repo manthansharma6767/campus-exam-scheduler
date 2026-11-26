@@ -99,15 +99,18 @@ export default function Dashboard() {
     setPasswordSaving(true);
     setPasswordError('');
     try {
-      await api.put('/api/auth/password', {
+      const response = await api.put('/api/auth/password', {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
+      if (response.data?.token) {
+        localStorage.setItem('token', response.data.token);
+      }
       setPasswordDialogOpen(false);
       setPasswordForm(emptyPasswordForm);
       setSnackbar({
         open: true,
-        message: 'Password changed successfully.',
+        message: 'Password changed. Other sessions have been signed out.',
         severity: 'success',
       });
     } catch (err) {

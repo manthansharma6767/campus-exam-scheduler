@@ -18,6 +18,7 @@ import com.manthan.campusexamscheduler.service.AdministratorService;
 import com.manthan.campusexamscheduler.service.AuthenticationService;
 import com.manthan.campusexamscheduler.service.DepartmentService;
 import com.manthan.campusexamscheduler.service.ExamService;
+import com.manthan.campusexamscheduler.service.RateLimitService;
 import com.manthan.campusexamscheduler.service.StudentImportService;
 import com.manthan.campusexamscheduler.service.StudentService;
 import com.manthan.campusexamscheduler.service.StudentVerificationService;
@@ -177,6 +178,9 @@ class SchedulerWorkflowIntegrationTest {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    private RateLimitService rateLimitService;
 
     @Autowired
     private StudentVerificationService studentVerificationService;
@@ -1052,7 +1056,7 @@ class SchedulerWorkflowIntegrationTest {
 
         // A signed token for an admin that no longer exists is ignored too.
         String unknownAdminToken = jwtService
-                .generateToken("missing-admin." + RUN_SUFFIX + "@example.test");
+                .generateToken("missing-admin." + RUN_SUFFIX + "@example.test", 0);
         mockMvc.perform(get("/api/departments")
                         .header("Authorization", "Bearer " + unknownAdminToken))
                 .andExpect(status().isUnauthorized());
@@ -1101,6 +1105,10 @@ class SchedulerWorkflowIntegrationTest {
                         .content("{\"dateOfBirth\":\"2005-03-09\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"));
+
+        // Rate-limit rows commit independently so they survive failed logins.
+        rateLimitService.clear("login:" + loginEmail);
+        rateLimitService.clear("student-verify:" + VERIFY_LIMIT_ROLL);
     }
 
     @Test
@@ -1134,12 +1142,25 @@ class SchedulerWorkflowIntegrationTest {
                                 + "\"newPassword\":\"CurrentPass123\"}"))
                 .andExpect(status().isBadRequest());
 
-        mockMvc.perform(put("/api/auth/password")
+        String responseBody = mockMvc.perform(put("/api/auth/password")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currentPassword\":\"CurrentPass123\","
                                 + "\"newPassword\":\"NewPass12345\"}"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String replacementToken = JsonPath.read(responseBody, "$.token");
+
+        // The old token is revoked immediately; the replacement token still works.
+        mockMvc.perform(get("/api/departments")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/departments")
+                        .header("Authorization", "Bearer " + replacementToken))
+                .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -1147,6 +1168,28 @@ class SchedulerWorkflowIntegrationTest {
                                 + "\",\"password\":\"CurrentPass123\"}"))
                 .andExpect(status().isUnauthorized());
         loginToken(admin.getEmail(), "NewPass12345");
+    }
+
+    @Test
+    void updatingAdministratorCredentialsRevokesExistingTokens() throws Exception {
+        String email = "update.revoke." + RUN_SUFFIX + "@example.test";
+        var admin = administratorService.registerAdmin(AdministratorRequest.builder()
+                .name("Credential Update Admin")
+                .email(email)
+                .password("OriginalPass123")
+                .build());
+        String token = loginToken(email, "OriginalPass123");
+
+        administratorService.updateAdmin(admin.getAdminId(), AdministratorRequest.builder()
+                .name("Credential Update Admin")
+                .email(email)
+                .password("UpdatedPass123")
+                .build());
+
+        mockMvc.perform(get("/api/departments")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+        loginToken(email, "UpdatedPass123");
     }
 
     private String loginToken(String email, String password) throws Exception {

@@ -5,6 +5,7 @@ import com.manthan.campusexamscheduler.entity.Administrator;
 import com.manthan.campusexamscheduler.exception.ResourceNotFoundException;
 import com.manthan.campusexamscheduler.exception.DuplicateResourceException;
 import com.manthan.campusexamscheduler.repository.AdministratorRepository;
+import com.manthan.campusexamscheduler.util.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ public class AdministratorService {
 
     private final AdministratorRepository administratorRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     public AdministratorResponse registerAdmin(AdministratorRequest request) {
         if (administratorRepository.existsByEmail(request.getEmail())) {
@@ -79,6 +81,7 @@ public class AdministratorService {
         administrator.setName(request.getName());
         administrator.setEmail(request.getEmail());
         administrator.setPassword(passwordEncoder.encode(request.getPassword()));
+        administrator.setTokenVersion(administrator.getTokenVersion() + 1);
 
         Administrator updatedAdmin = administratorRepository.save(administrator);
 
@@ -98,7 +101,7 @@ public class AdministratorService {
     }
 
     @Transactional
-    public void changePassword(String email, ChangePasswordRequest request) {
+    public AuthenticationResponse changePassword(String email, ChangePasswordRequest request) {
         Administrator administrator = administratorRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Administrator not found"));
 
@@ -113,6 +116,12 @@ public class AdministratorService {
         }
 
         administrator.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        administratorRepository.save(administrator);
+        administrator.setTokenVersion(administrator.getTokenVersion() + 1);
+        Administrator saved = administratorRepository.save(administrator);
+
+        // Keep the current session signed in while revoking every older token.
+        return AuthenticationResponse.builder()
+                .token(jwtService.generateToken(saved.getEmail(), saved.getTokenVersion()))
+                .build();
     }
 }

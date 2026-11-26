@@ -31,6 +31,10 @@ public class CustomUserDetails implements UserDetails {
         return administrator.getEmail();
     }
 
+    public long getTokenVersion() {
+        return administrator.getTokenVersion();
+    }
+
     @Override
     public boolean isAccountNonExpired() {
         return true;

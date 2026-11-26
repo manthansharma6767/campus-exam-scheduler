@@ -49,12 +49,12 @@ public class AuthenticationController {
      * by the normal JWT filter; only login and first-admin setup are public.
      */
     @PutMapping("/password")
-    public ResponseEntity<Void> changePassword(
+    public ResponseEntity<AuthenticationResponse> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
             Authentication authentication) {
 
-        administratorService.changePassword(authentication.getName(), request);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(
+                administratorService.changePassword(authentication.getName(), request));
     }
 
     /**

@@ -202,6 +202,21 @@ class SchedulerWorkflowIntegrationTest {
     }
 
     @Test
+    void healthEndpointIsPublicAndOmitsComponentDetails() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.components").doesNotExist());
+    }
+
+    @Test
+    void unknownPublicPathsReturnNotFound() throws Exception {
+        mockMvc.perform(get("/swagger-ui/missing.js"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
     void seatingPlanListRemainsPublicButRosterExportRequiresLogin() throws Exception {
         mockMvc.perform(get("/api/seating/plans"))
                 .andExpect(status().isOk());

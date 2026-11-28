@@ -13,10 +13,11 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.multipart.MaxUploadSizeExceededException;
-import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
@@ -132,6 +133,13 @@ public class GlobalExceptionHandler {
                 .build();
 
         return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRoute(NoResourceFoundException ex) {
+        // Unknown paths, including disabled Swagger routes, are ordinary 404s
+        // rather than 500s that pollute the error log.
+        return error(HttpStatus.NOT_FOUND, "The requested resource was not found.");
     }
 
     @ExceptionHandler(Exception.class)

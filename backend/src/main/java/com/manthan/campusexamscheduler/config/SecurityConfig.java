@@ -75,6 +75,13 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET, "/api/seating/plans", "/api/seating/plans/*/roll/*").permitAll()
 
+                        // Container health probes
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/actuator/health",
+                                "/actuator/health/**"
+                        ).permitAll()
+
                         // Swagger / OpenAPI (development convenience)
                         .requestMatchers(
                                 "/swagger-ui.html",

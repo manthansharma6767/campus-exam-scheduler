@@ -1,0 +1,11 @@
+.git
+.github
+frontend
+backend/target
+**/node_modules
+**/dist
+*.log
+.env
+.env.*
+!.env.example
+postman

@@ -34,6 +34,7 @@ Campus Exam Scheduler is a full-stack application for publishing university exam
 - Flyway-owned schema migrations with Hibernate schema validation
 - Bean Validation, consistent JSON error responses, and a 10 MB upload limit
 - OpenAPI documentation through Swagger UI
+- Docker Compose stack with MySQL, health checks, an nginx-served frontend, and same-origin API proxying
 - Backend integration and import tests plus frontend lint and production build checks
 
 ## Technology
@@ -158,7 +159,7 @@ Do not put database credentials, JWT secrets, or setup tokens in `VITE_*` variab
 
 ## Configuration
 
-Spring does not automatically load the root `.env` file. `.env.example` is a reference for the available variables; set values through your shell, IDE, container runtime, or platform secret manager.
+Spring does not automatically load the root `.env` file. Docker Compose does. `.env.example` is a reference for the available variables; set values through your shell, IDE, container runtime, or platform secret manager.
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
@@ -169,6 +170,7 @@ Spring does not automatically load the root `.env` file. `.env.example` is a ref
 | `ADMIN_SETUP_TOKEN` | No | Empty | Enables the one-time first-administrator bootstrap endpoint when non-blank |
 | `CORS_ALLOWED_ORIGINS` | No | `http://localhost:5173,http://localhost:5174` | Comma-separated exact frontend origins |
 | `SPRING_JPA_SHOW_SQL` | No | `false` | Enables Hibernate SQL logging |
+| `SWAGGER_ENABLED` | No | `true` | Enables Swagger UI and OpenAPI routes; set to `false` in production |
 | `FLYWAY_ENABLED` | No | `true` | Enables Flyway on startup; tests disable it programmatically |
 | `TESSERACT_CMD` | No | Auto-detected | Full path to the Tesseract executable for scanned timetable PDFs |
 | `VITE_API_BASE_URL` | No | `http://localhost:8080` | Frontend build-time API base URL |
@@ -322,11 +324,12 @@ All endpoints return JSON unless noted. Multipart endpoints accept a `file` part
 | Seating import | `POST /api/seating/plans/import` | Administrator JWT; multipart PDF; optional `title` |
 | Seating export | `GET /api/seating/plans/{planId}/export` | Administrator JWT; CSV attachment |
 | Public seating | `GET /api/seating/plans`, `GET /api/seating/plans/{planId}/roll/{rollNumber}` | Public |
-| API documentation | `/swagger-ui/index.html`, `/v3/api-docs` | Public by default |
+| Health check | `GET /actuator/health` | Public; returns only the aggregate status |
+| API documentation | `/swagger-ui/index.html`, `/v3/api-docs` | Public by default; disabled when `SWAGGER_ENABLED=false` |
 
 Every route not listed above requires a valid administrator JWT in the `Authorization: Bearer <token>` header.
 
-Swagger UI is available while the backend is running at `http://localhost:8080/swagger-ui/index.html`. The current security configuration permits Swagger and OpenAPI routes publicly. In production, disable them with `springdoc.api-docs.enabled=false` and `springdoc.swagger-ui.enabled=false`, or restrict them at the reverse proxy.
+Swagger UI is available while the backend is running at `http://localhost:8080/swagger-ui/index.html`. The current security configuration permits Swagger and OpenAPI routes publicly. In production, disable them with `SWAGGER_ENABLED=false` (the Compose stack does this by default), or restrict them at the reverse proxy.
 
 ## Security model
 
@@ -359,7 +362,7 @@ Operational expectations:
 - **Replace-all administrator saves:** Administrator absentee saves replace the complete assignment set. Concurrent edits can overwrite each other, so refresh before saving when multiple administrators may be working on the same student.
 - **Tests use the application schema:** The backend test guard requires the `campus_exam_scheduler` schema and disables Flyway. Tests are transactional and roll back their own records, but they are not isolated from existing data. Run them only against a local or disposable database.
 - **Docker image does not include OCR:** The checked-in backend image does not install Tesseract. Text-based PDFs work, but scanned timetable PDF import requires a custom image with Tesseract and language data, or running the backend on a host where Tesseract is installed.
-- **Public Swagger UI:** Swagger and OpenAPI routes are public by default. Restrict or disable them in production.
+- **Public Swagger UI:** Swagger and OpenAPI routes are public by default. Set `SWAGGER_ENABLED=false` in production; the Compose stack does this. Alternatively restrict the routes at the reverse proxy.
 - **No student sign-in:** The student experience is a public schedule lookup plus date-of-birth verification for absentee self-service. There is no student password login or server-side student session.
 
 ## Testing
@@ -404,6 +407,54 @@ The workflow is defined in `.github/workflows/ci.yml`. Branch protection on `mai
 
 ## Build and deployment
 
+### Full-stack Docker Compose
+
+`compose.yaml` runs MySQL, the backend, and an nginx-served frontend as one stack. nginx proxies `/api` to the backend, so the browser only talks to one origin and the Compose deployment needs no browser CORS setup.
+
+Prerequisites: Docker Engine with Compose v2 and at least 4 GB of memory available to Docker.
+
+1. Copy `.env.example` to `.env` in the repository root and replace the placeholders. At minimum, set `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`, `JWT_SECRET`, and `ADMIN_SETUP_TOKEN`.
+2. Build and start the stack:
+
+   ```powershell
+   docker compose up --build -d
+   ```
+
+3. Wait for every service to report `healthy`:
+
+   ```powershell
+   docker compose ps
+   ```
+
+4. Open `http://localhost:8080/admin/setup` and create the first administrator with the `ADMIN_SETUP_TOKEN` from `.env`. After setup, remove that line from `.env` and run `docker compose up -d` to restart the backend without it.
+5. Sign in at `http://localhost:8080/admin/login`.
+
+| Service | Container port | Host port | Health check |
+| --- | --- | --- | --- |
+| `frontend` | 80 | `8080` (`FRONTEND_PORT`) | `GET /healthz` |
+| `backend` | 8080 | `8081` (`BACKEND_PORT`) | `GET /actuator/health` |
+| `mysql` | 3306 | Not published | `mysqladmin ping` |
+
+Flyway applies V1 through V4 on the first start. Data persists in the Compose project's `mysql-data` volume. Use `docker compose logs -f backend` to follow startup and migration logs.
+
+Common commands:
+
+```powershell
+docker compose up --build -d      # rebuild images after code changes
+docker compose ps                 # health and port status
+docker compose logs -f frontend   # nginx access and proxy logs
+docker compose down               # stop containers, keep the database volume
+docker compose down -v            # stop containers and delete all database data
+```
+
+Production notes:
+
+- Terminate TLS at a reverse proxy or load balancer in front of the frontend container. The Compose stack serves plain HTTP on port 80.
+- Keep the backend and MySQL ports private; only the frontend needs to be reachable from clients.
+- Store secrets in the deployment platform's secret store rather than a committed file. `docker compose` reads `.env` automatically, so never commit it.
+- `SWAGGER_ENABLED` defaults to `false` in the Compose stack. Set it to `true` only in development.
+- The backend image does not include Tesseract. Scanned timetable PDF import needs a custom image or a host with Tesseract installed.
+
 ### Backend JAR
 
 ```powershell
@@ -429,7 +480,7 @@ docker run --rm -p 8080:8080 `
   campus-exam-scheduler-backend
 ```
 
-On Docker Desktop, `host.docker.internal` reaches MySQL on the host. On Linux, use the database host's reachable address or a container network. The image does not include Tesseract, so scanned timetable OCR requires a custom image. The repository does not include a Compose file; run MySQL separately or provide your own orchestration.
+On Docker Desktop, `host.docker.internal` reaches MySQL on the host. On Linux, use the database host's reachable address or a container network. The image is a multi-stage build that runs as a non-root user and exposes `GET /actuator/health` for orchestrator health checks. Use `compose.yaml` for a complete stack. The image does not include Tesseract, so scanned timetable OCR requires a custom image.
 
 ### Frontend deployment
 
@@ -447,6 +498,9 @@ Build the frontend with `npm ci && npm run build`, then serve `frontend/dist/` f
 | Login or verification returns `429` | Wait for the `Retry-After` period; the limiter allows 5 failures per 15 minutes |
 | Browser blocks an API request with a CORS error | Add the exact frontend origin, including scheme and port, to `CORS_ALLOWED_ORIGINS` |
 | Vite opened on port 5174 and API calls fail | Add `http://localhost:5174` to `CORS_ALLOWED_ORIGINS` |
+| A Compose service stays `unhealthy` | Run `docker compose logs <service>`; MySQL must pass its ping check before the backend starts, and the backend needs up to 60 seconds for Flyway and Hibernate |
+| `docker compose up` reports a missing variable | Copy `.env.example` to `.env` and set `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`, `JWT_SECRET`, and `ADMIN_SETUP_TOKEN` |
+| Port 8080 or 8081 is already in use | Stop the conflicting process or change `FRONTEND_PORT` or `BACKEND_PORT` in `.env` |
 | Student verification always fails | Confirm the student has a `date_of_birth` set and the submitted date matches exactly |
 | DOB backfill preview reports unmatched enrollment numbers | Fix the enrollment numbers in the file; unmatched rows block the entire apply |
 | DOB backfill confirm button is disabled | Preview the file first and resolve every row error or unmatched enrollment number |
@@ -463,7 +517,7 @@ Create a branch from `main` and open a pull request; never commit or push direct
 3. Keep schema changes additive and add a new Flyway migration rather than editing an applied one.
 4. Do not commit `.env` files, logs, generated build output, setup tokens, JWT secrets, or real student data.
 
-CI runs the same backend and frontend checks automatically. Both must pass before the pull request can be merged.
+CI runs the same backend and frontend checks automatically. Both required checks must pass before the pull request can be merged.
 
 ## License
 
